@@ -26,6 +26,22 @@
 - Spec 002 AC-01 to AC-08 met (AC-09 is checked in Phase 3).
 - `validate_prompt_structure` returns no errors for the file.
 
+## v1 x v2 differences
+
+Input for the README comparison (FR-033).
+
+| Aspect | v1 | v2 | Why |
+|---|---|---|---|
+| Persona | "Você é um assistente" (vague) | Senior Product Manager with software engineering and QA experience | Role Prompting sets vocabulary and quality bar |
+| Task | "crie uma user story" | One User Story in a defined format, in Brazilian Portuguese | Specific instructions reduce variation |
+| Reasoning | None | 5 internal analysis steps (classify complexity, actor, technical data, expected behavior, format), not shown | Chain of Thought improves structure without hurting Precision and Clarity |
+| Output format | Not defined | Story sentence + Dado que / Quando / Então / E criteria; extra blocks for medium reports; `=== ... ===` sections for complex ones | Mirrors the dataset references the judge compares against |
+| Rules | None | Explicit do / do not list (preserve technical data, no invented facts, proportional length, no preamble) | Precision penalizes invented and off-topic content in both derived metrics |
+| Edge cases | None | Vague or incomplete report; several problems in one report | FR-010 |
+| Examples | None | 3 own examples: simple, medium, complex | Few-shot teaches the format of each level |
+| Input variable | `{bug_report}` duplicated in system and user prompts | `{bug_report}` only in the user prompt | Removes the duplication (FR-011) |
+| Metadata | No techniques listed | `techniques_applied`: few-shot, role-prompting, chain-of-thought | FR-005, BR-008 |
+
 ## Next
 
 Phase 5 (tests) runs before Phase 3 (push), so the prompt is validated before it is published.

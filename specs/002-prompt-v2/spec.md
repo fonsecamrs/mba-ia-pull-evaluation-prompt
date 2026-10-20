@@ -114,7 +114,10 @@ it is optional.
 
 - Do: preserve literally the technical data from the report (endpoints, codes, values, error messages).
 - Do: write criteria that describe the expected correct behavior implied by the report.
-- Do not: invent data absent from the report (names, values, metrics, tools).
+- Do: for slowness or freezing reports, set an objective and reasonable target for the expected behavior
+  (e.g. a maximum load time), as the medium references do ("em menos de 30 segundos").
+- Do not: invent facts about the problem absent from the report (causes, measured values, names, tools).
+  Targets for the expected behavior are not facts about the problem.
 - Do not: add features, sections or recommendations unrelated to the reported problems.
 - Do not: show the analysis, comments about the task or text outside the User Story.
 
