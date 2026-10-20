@@ -22,13 +22,15 @@ structural requirements of [spec 002](../002-prompt-v2/spec.md).
 |---|---|---|
 | `test_prompt_has_system_prompt` | `system_prompt` exists and is not empty after `strip()` | FR-026 |
 | `test_prompt_has_role_definition` | `system_prompt` contains a persona sentence starting with "Você é" | FR-027 |
-| `test_prompt_mentions_format` | `system_prompt` mentions "User Story" or "Markdown" (case-insensitive) | FR-028 |
-| `test_prompt_has_few_shot_examples` | At least 3 occurrences each of `Exemplo`, `Entrada:` and `Saída:` in `system_prompt` | FR-029 |
+| `test_prompt_mentions_format` | `system_prompt` mentions "User Story" (case-insensitive) and describes the standard template "Como um ..., eu quero ..., para que ..." | FR-028 |
+| `test_prompt_has_few_shot_examples` | At least 3 occurrences each of `Exemplo N` (N a digit), `Entrada:` and `Saída:` in `system_prompt` | FR-029 |
 | `test_prompt_no_todos` | No `[TODO]` in `system_prompt` or `user_prompt` | FR-030 |
 | `test_minimum_techniques` | `techniques_applied` is a list with at least 2 items | FR-031 |
 | `test_bug_report_only_in_user_prompt` (additional) | `{bug_report}` is in `user_prompt` and not in `system_prompt` | FR-039 |
+| `test_prompt_passes_structure_validation` (additional) | `validate_prompt_structure(prompt)` returns `(True, [])`, the same check the push runs; also covers uppercase `TODO` | FR-016 |
 
-Optional additional test: `validate_prompt_structure(prompt)` returns `(True, [])`, which also covers uppercase `TODO`.
+A bare "Markdown" match is not accepted for the format test: the v2 prompt mentions Markdown only to forbid Markdown
+headings, so that match would pass without any format requirement (found by the AC-03 check on 2026-10-19).
 
 ## Rules
 

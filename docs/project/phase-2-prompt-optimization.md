@@ -42,6 +42,19 @@ Input for the README comparison (FR-033).
 | Input variable | `{bug_report}` duplicated in system and user prompts | `{bug_report}` only in the user prompt | Removes the duplication (FR-011) |
 | Metadata | No techniques listed | `techniques_applied`: few-shot, role-prompting, chain-of-thought | FR-005, BR-008 |
 
+## Generation smoke test (2026-10-19)
+
+Local v2 prompt, `gemini-3.1-flash-lite`, temperature 0, no judge, 3 dataset examples. Not an iteration (no experiment).
+
+| Example | Time | Length (generated / reference) | Format | Looping (RK-12) |
+|---|---|---|---|---|
+| 1 (simple) | 4.8 s | 428 / 408 chars | Correct | None |
+| 6 (medium) | 1.3 s | 818 / 664 chars | Correct, "Como o sistema" actor | None |
+| 13 (complex) | 10.0 s | 3609 / 3605 chars | Correct, sections A to D | None |
+
+Watch in the first evaluation: in example 6 the model chose the final status "pago", which the report does not state
+(the reference uses "aprovado"), and its "Sugestão" item was generic. No prompt change before the first evaluation.
+
 ## Next
 
 Phase 5 (tests) runs before Phase 3 (push), so the prompt is validated before it is published.
