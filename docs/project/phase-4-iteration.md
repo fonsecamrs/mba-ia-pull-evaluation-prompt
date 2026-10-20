@@ -18,9 +18,20 @@ Clarity rewards conciseness; F1 rewards covering what the reference covers.
 
 | # | Date | Change | Helpfulness | Correctness | F1 | Clarity | Precision | Average | Status | Valid |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 | | First version (Phase 3) | | | | | | | | |
+| 1 | 2026-10-20 | First version (Phase 3) | 0.93 | 0.91 | 0.90 | 0.95 | 0.91 | 0.918 | APROVADO | Yes |
 
-Discarded runs (BR-018) are listed with the reason and do not get an iteration number.
+Discarded runs (BR-018) are listed with the reason and do not get an iteration number. None so far.
+
+### Iteration 1 notes
+
+- Experiment `fonsecamrs-bug_to_user_story_v2-e38ce611`, dataset `mba-ia-pull-evaluation-prompt-eval` (created by this run).
+- Validity checks: no "Erro ao avaliar", no JSON extraction failure, no quota error (BR-018).
+- RK-12: no looping in any of the 15 answers; every answer starts with the story sentence; only the 3 complex
+  reports used the `=== ... ===` sections.
+- The judge model `gemini-3.5-flash-lite` ignores the temperature parameter ("uses fixed sampling defaults"), so the
+  45 judge calls ran at the model default; the generator accepted temperature 0. See ADR-001.
+- Lowest examples: 5 (F1 0.77, Precision 0.83) and 11 (Precision 0.83). Every metric average is above 0.8, so no
+  further iteration is required (Q-010: one valid approved run is enough).
 
 ## Delivery (after approval)
 

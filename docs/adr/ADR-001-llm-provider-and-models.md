@@ -57,7 +57,11 @@ EVAL_MODEL=gemini-3.5-flash-lite
 - If the generator proves too weak to reach 0.8, switch to option E by changing `LLM_MODEL` only, and record a new baseline (BR-019).
 - RK-12: the Gemini 3 developer guide recommends keeping temperature at the default 1.0, warning of looping or degraded
   quality below it. Temperature 0 is imposed by the evaluation code and accepted; the traces of the 3 complex examples
-  are checked in the first run.
+  are checked in the first run. Checked on 2026-10-20: no looping.
+- Found in the first run (2026-10-20): `gemini-3.5-flash-lite` ignores the temperature parameter
+  (`langchain-google-genai` warns that the model "uses fixed sampling defaults"), so the judge runs at the model
+  default instead of 0. Judge scores may vary more between runs (RK-03). Accepted: one valid approved run is enough
+  (Q-010), and the generator (`gemini-3.1-flash-lite`) does accept temperature 0.
 - On the free tier, Google may use submitted content to improve its products (to confirm in the current terms).
   Impact is nil: the dataset is fictitious and contains no personal data.
 - Limits and model availability change often. Re-check them in AI Studio before Phase 3; a change in quotas or the

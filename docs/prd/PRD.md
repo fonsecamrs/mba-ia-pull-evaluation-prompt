@@ -399,7 +399,7 @@ Feature: Public delivery evidence (FR-035, FR-036)
 
 | ID | Category | Requirement | Evaluation criterion | Origin |
 |---|---|---|---|---|
-| NFR-001 | Reproducibility | Generation and evaluation run with temperature 0 (Existing). The Gemini 3.x guide recommends the default 1.0 and warns that lower values may cause looping or degraded quality; this is accepted because the evaluation code cannot change (RK-12) | Evaluation runs without temperature errors; first run traces checked for looping | Existing; [ADR-001](../adr/ADR-001-llm-provider-and-models.md) |
+| NFR-001 | Reproducibility | Generation and evaluation run with temperature 0 (Existing). The Gemini 3.x guide recommends the default 1.0 and warns that lower values may cause looping or degraded quality; this is accepted because the evaluation code cannot change (RK-12). The judge model `gemini-3.5-flash-lite` ignores the parameter and runs at its default (found on 2026-10-20) | Evaluation runs without temperature errors; first run traces checked for looping (none found) | Existing; [ADR-001](../adr/ADR-001-llm-provider-and-models.md) |
 | NFR-002 | Configurability | Provider, generation model and evaluation model are set only in the environment configuration | Changing provider or model only requires editing `.env` | Confirmed |
 | NFR-003 | Credential security | Credentials live only in the local `.env`, are never versioned and never appear in the README, screenshots or routine output | Repository and evidence contain no keys | Confirmed |
 | NFR-004 | Third-party content safety | Pulling a third-party `owner/name` prompt is explicitly allowed only for the challenge seed prompt | No other third-party prompt is pulled | Confirmed |
@@ -513,7 +513,7 @@ No maximum run time is defined: the sources give no basis for one.
 |---|---|---|
 | RK-01 | Free-tier rate or daily quota interrupts the evaluation | Sequential evaluation (Existing); generation and judge on different models to split the quota (ADR-001); space out runs |
 | RK-02 | A judge call or parsing failure yields 0.0 for the example and lowers the average | Check the output and traces before changing the prompt; BR-018 |
-| RK-03 | Scores vary between runs because of the LLM judge | Temperature 0; fixed models (BR-019); record each iteration's scores |
+| RK-03 | Scores vary between runs because of the LLM judge; higher than planned because the judge model ignores temperature 0 | Fixed models (BR-019); record each iteration's scores; one valid approved run is enough (Q-010) |
 | RK-04 | Chosen model discontinued or without temperature 0 support | Re-check the official documentation before Phase 3 (ADR-001) |
 | RK-05 | Over-fitting the prompt to the dataset | Own Few-shot examples (BR-020) |
 | RK-06 | Permanent choice of an unsuitable handle | Choose carefully before confirming; recommendation: same as the GitHub username |
