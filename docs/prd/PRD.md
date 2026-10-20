@@ -555,6 +555,7 @@ RK-07 (delivery repository not a fork) was closed on 2026-10-13: the fork `fonse
 | Q-010 | Approval stability | One valid approved run is enough | 2026-10-19 |
 | Q-012 | Number of Few-shot examples | 3: simple, medium, complex | 2026-10-19 |
 | Q-013 | Mandatory edge cases | Vague or incomplete report; several problems in one report | 2026-10-19 |
+| Q-015 | Pinned packages on Python 3.14 | Compatible: `pip install -r requirements.txt` succeeded on Python 3.14.5 | 2026-10-19 |
 | — | Database | None | 2026-10-13 |
 | — | Discovery scope | Challenge only, lean documentation | 2026-10-13 |
 | — | Additional techniques | Role Prompting and internal Chain of Thought | 2026-10-19 |
@@ -566,8 +567,7 @@ RK-07 (delivery repository not a fork) was closed on 2026-10-13: the fork `fonse
 | ID | Question | Impact | Next action |
 |---|---|---|---|
 | Q-011 | Product owner and PRD approver: Marcos Fonseca is assumed | Document governance | Confirm when approving this version |
-| Q-014 | How to show the techniques on the Hub: tags and description (recommended) or another field | FR-019 verifiability | Check `Client.push_prompt` in the installed `langsmith` during Phase 3 |
-| Q-015 | Compatibility of the pinned packages with Python 3.14 | Environment setup | Check during the Phase 1 install; fallback: install Python 3.12 or 3.13 |
+| Q-014 | How to show the techniques on the Hub: tags and description (recommended), plus optionally `readme` (available in `langsmith` 0.13.0) | FR-019 verifiability | Decide in Phase 3 |
 
 ## 18. Product evolution and PRD versioning
 

@@ -37,8 +37,10 @@ bug_to_user_story_v1:
 ```
 
 - `system_prompt` and `user_prompt` must equal the Hub texts.
-- `description` and `tags` come from the Hub metadata when available. Where the installed `langsmith` exposes them
-  is checked during implementation; if they are not exposed, keep the values of the current file.
+- `description` and `tags` come from the Hub metadata (`Client.get_prompt`) when it has any; otherwise the values of
+  the current file are kept, as is its `created_at`. Checked on 2026-10-19: the seed prompt has an empty description
+  and only the automatic tag `ChatPromptTemplate` (the object type, ignored), so the current file metadata is kept.
+- `save_yaml` writes the multi-line texts as quoted strings instead of `|` blocks; the content is identical.
 
 ## Exceptions
 

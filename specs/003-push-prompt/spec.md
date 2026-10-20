@@ -31,8 +31,8 @@ metadata, so `src/evaluate.py` can evaluate it (BR-007).
 
 - `description`: the YAML `description`, followed by the applied techniques.
 - `tags`: the YAML `tags` plus each item of `techniques_applied`, without duplicates.
-- Before implementing, check the signature of `Client.push_prompt` in the installed `langsmith` (0.13.0). If it offers
-  a dedicated field for this kind of metadata, record the choice and close Q-014.
+- Checked in Phase 1: `Client.push_prompt` in `langsmith` 0.13.0 also accepts `readme`, `commit_tags` and
+  `commit_description`. Deciding whether the techniques also go into `readme` closes Q-014 in Phase 3.
 
 ## Exceptions
 
