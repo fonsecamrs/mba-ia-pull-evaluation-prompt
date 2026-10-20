@@ -31,8 +31,9 @@ metadata, so `src/evaluate.py` can evaluate it (BR-007).
 
 - `description`: the YAML `description`, followed by the applied techniques.
 - `tags`: the YAML `tags` plus each item of `techniques_applied`, without duplicates.
-- Checked in Phase 1: `Client.push_prompt` in `langsmith` 0.13.0 also accepts `readme`, `commit_tags` and
-  `commit_description`. Deciding whether the techniques also go into `readme` closes Q-014 in Phase 3.
+- `readme` (decided 2026-10-19, closes Q-014): Markdown with the prompt name, description, applied techniques,
+  input variable and version, shown on the public Hub page.
+- `Client.push_prompt` in `langsmith` 0.13.0 also accepts `commit_tags` and `commit_description`; they are not used.
 
 ## Exceptions
 
@@ -42,7 +43,8 @@ metadata, so `src/evaluate.py` can evaluate it (BR-007).
 | Missing file or invalid YAML | `load_yaml` message, exit `1`, nothing published |
 | Missing root key | Message in Portuguese naming the expected key, exit `1` |
 | Validation errors | All errors listed in Portuguese, exit `1` |
-| Handle not found or not public | Explain how to create it: LangSmith > Prompts > three dots next to Playground > Make Public > Choose your public handle; exit `1` |
+| Handle not found or not public | Explain how to create it: LangSmith > Prompts > three dots next to Playground > Make Public > Choose your public handle; exit `1`. `langsmith` raises `LangSmithUserError` (or `ValueError` when updating) before publishing when the account has no handle or the handle belongs to another account |
+| Commit conflict (`LangSmithConflictError`) | Message in Portuguese; possibly the content is identical to the last published version; exit `1` |
 | Other Hub errors | Message in Portuguese with the reason, exit `1` |
 
 ## Acceptance criteria

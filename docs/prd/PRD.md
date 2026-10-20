@@ -207,7 +207,7 @@ Detailed in [spec 003](../../specs/003-push-prompt/spec.md).
 | FR-016 | The system validates the prompt structure before publishing | A prompt without description, without or with empty system prompt, without version, with pending markers or with fewer than 2 techniques is not published; all errors are listed | BR-008 | FR-015 |
 | FR-017 | The system publishes the prompt as `{handle}/bug_to_user_story_v2` | After publishing, the prompt is found on the Hub by that identifier | BR-005 | FR-016 |
 | FR-018 | The published prompt is public | The prompt opens for a user without workspace access | BR-006 | FR-017 |
-| FR-019 | Publishing records tags, description and applied techniques | Tags, description and techniques are visible on the Hub (techniques in tags and description, pending confirmation of available fields: Q-014) | — | FR-017 |
+| FR-019 | Publishing records tags, description and applied techniques | Tags, description and `readme` are visible on the Hub, each listing the applied techniques (Q-014) | — | FR-017 |
 | FR-020 | The system reports success or failure; on a missing handle, it explains how to create one via Make Public in the LangSmith UI. Should Have: print the published prompt URL | Exit status reflects the result; messages in Portuguese | BR-005 | FR-017 |
 
 ### 9.4. G4: Quality evaluation (Existing)
@@ -555,6 +555,7 @@ RK-07 (delivery repository not a fork) was closed on 2026-10-13: the fork `fonse
 | Q-010 | Approval stability | One valid approved run is enough | 2026-10-19 |
 | Q-012 | Number of Few-shot examples | 3: simple, medium, complex | 2026-10-19 |
 | Q-013 | Mandatory edge cases | Vague or incomplete report; several problems in one report | 2026-10-19 |
+| Q-014 | Techniques on the Hub | In tags, description and `readme` of the published prompt (spec 003) | 2026-10-19 |
 | Q-015 | Pinned packages on Python 3.14 | Compatible: `pip install -r requirements.txt` succeeded on Python 3.14.5 | 2026-10-19 |
 | — | Database | None | 2026-10-13 |
 | — | Discovery scope | Challenge only, lean documentation | 2026-10-13 |
@@ -567,7 +568,6 @@ RK-07 (delivery repository not a fork) was closed on 2026-10-13: the fork `fonse
 | ID | Question | Impact | Next action |
 |---|---|---|---|
 | Q-011 | Product owner and PRD approver: Marcos Fonseca is assumed | Document governance | Confirm when approving this version |
-| Q-014 | How to show the techniques on the Hub: tags and description (recommended), plus optionally `readme` (available in `langsmith` 0.13.0) | FR-019 verifiability | Decide in Phase 3 |
 
 ## 18. Product evolution and PRD versioning
 
