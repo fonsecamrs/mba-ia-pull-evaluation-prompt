@@ -9,6 +9,7 @@ Meta: o prompt `{USERNAME_LANGSMITH_HUB}/bug_to_user_story_v2` atingir >= 0.8 em
 - Python 3.10+, `langchain-core`, `langsmith` (Client: Prompt Hub, datasets, experimentos), prompts em YAML, `pytest`.
 - Versões fixadas em `requirements.txt`. Não usar `langchain.hub` (removido na v1 do LangChain): pull/push via `langsmith.Client`.
 - LLM configurado só por `.env`: `LLM_PROVIDER` (`google` ou `openai`), `LLM_MODEL` (resposta) e `EVAL_MODEL` (avaliação).
+  Provedor, modelos e plano (Gemini gratuito) decididos em `docs/adr/ADR-001-llm-provider-and-models.md`.
 - Este projeto não usa banco de dados.
 
 ## Comandos
@@ -26,8 +27,10 @@ pytest tests/test_prompts.py   # validação estrutural do prompt v2 (offline)
 
 ## Fluxo de trabalho
 
-1. Pull do v1 -> 2. editar `prompts/bug_to_user_story_v2.yml` -> 3. push -> 4. evaluate -> repetir 2 a 4 (3 a 5 iterações esperadas).
+1. Pull do v1 -> 2. editar `prompts/bug_to_user_story_v2.yml` -> 3. pytest -> 4. push -> 5. evaluate -> repetir 2 a 5 (3 a 5 iterações esperadas).
 - `evaluate.py` avalia a versão publicada no Hub, não o arquivo local: toda alteração no v2 exige novo push antes de avaliar.
+- Execução com "Erro ao avaliar" na saída (cota, rede) é descartada e repetida sem mudar o prompt; não conta como iteração (BR-018).
+- Modelos fixos a partir da primeira avaliação; trocar só registrando nova linha de base (BR-019).
 - O handle do Hub (`USERNAME_LANGSMITH_HUB`) só existe após tornar um prompt público na UI do LangSmith (Make Public). É definitivo.
 - Diagnóstico de notas baixas: usar o tracing do LangSmith, exemplo a exemplo.
 
@@ -59,10 +62,12 @@ Reutilizar os helpers de `src/utils.py` (`load_yaml`, `save_yaml`, `check_env_va
 
 ## Fases e branches
 
-As fases seguem a numeração dos requisitos do desafio. Cada fase tem branch própria e documento em `docs/project/`.
+As fases seguem a numeração dos requisitos do desafio. Cada fase tem branch própria (`phase-N-<nome>`, igual ao nome
+do documento sem `.md`) e documento em `docs/project/`. Ordem de execução: 0, 1, 2, 5, 3, 4 (testes antes do push).
 
 | Fase | Entrega | Documento |
 |---|---|---|
+| 0 | Discovery: PRD, ADR, specs e documentos de fase | — (branch `phase-0-discovery`) |
 | 1 | Pull do prompt v1 | `phase-1-pull.md` |
 | 2 | Prompt otimizado v2 | `phase-2-prompt-optimization.md` |
 | 3 | Push ao Hub e primeira avaliação | `phase-3-push-evaluation.md` |
@@ -72,7 +77,7 @@ As fases seguem a numeração dos requisitos do desafio. Cada fase tem branch pr
 ## Git e commits
 
 - Nunca commitar automaticamente: apresentar arquivos alterados e mensagem proposta e aguardar autorização explícita.
-- Criar uma branch nova ao iniciar cada fase. O padrão de nome não está definido: confirmar o nome com o usuário.
+- Criar uma branch nova ao iniciar cada fase, no padrão `phase-N-<nome>` (ver "Fases e branches").
 - Conventional Commits com descrição em português: `<tipo>: <descrição>`.
 - Tipos permitidos:
   - `feat`: nova funcionalidade
@@ -83,7 +88,7 @@ As fases seguem a numeração dos requisitos do desafio. Cada fase tem branch pr
   - `perf`: melhoria de desempenho
   - `test`: adicionar ou corrigir testes
   - `chore`: build, configuração de ferramentas ou pacotes (ex.: `.gitignore`)
-- Repositório de entrega: fork público de `devfullcycle/mba-ia-pull-evaluation-prompt`.
+- Repositório de entrega: `fonsecamrs/mba-ia-pull-evaluation-prompt`, fork público de `devfullcycle/mba-ia-pull-evaluation-prompt`.
 
 ## Idioma
 
@@ -100,7 +105,8 @@ As fases seguem a numeração dos requisitos do desafio. Cada fase tem branch pr
 ## Documentação
 
 - Enxuta: criar apenas o necessário para orientar a implementação.
-- Regras de negócio (o quê): `specs/`. Como implementar cada fase: `docs/project/`.
+- Requisitos e regras de negócio (o quê): `docs/prd/PRD.md`. Detalhe por funcionalidade: `specs/`.
+  Decisões arquiteturais: `docs/adr/`. Como implementar cada fase: `docs/project/`. Imagens do README: `docs/images/`.
 - Convenções de PRD, specs, ADRs, documentos de fase e seções obrigatórias do README: rule de documentação.
 
 ## Rules específicas

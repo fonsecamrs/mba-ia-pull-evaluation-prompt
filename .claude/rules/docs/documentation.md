@@ -27,13 +27,17 @@ paths:
 
 ## README.md (seções obrigatórias da entrega)
 
+O README de entrega substitui o enunciado do desafio e inclui link para o enunciado no repositório original.
+
 ### Técnicas Aplicadas (Fase 2)
 - Técnicas escolhidas, justificativa de cada uma e exemplo prático de aplicação no prompt v2.
 
 ### Resultados Finais
 - Link público do dataset de avaliação com os experimentos (gerado por `share_dataset`).
-- Screenshots das avaliações com todas as métricas >= 0.8 (local de armazenamento das imagens: confirmar com o usuário).
-- Comparação v1 vs v2: o que mudou e por quê, incluindo o histórico das iterações e suas notas.
+- Screenshots das avaliações com todas as métricas >= 0.8, salvos em `docs/images/` (a pasta `screenshots/` é ignorada
+  pelo `.gitignore` do repositório base).
+- Comparação v1 vs v2 qualitativa: o que mudou e por quê, incluindo o histórico das iterações válidas e suas notas.
+  O v1 não é avaliado.
 
 ### Como Executar
 - Pré-requisitos (Python 3.10+, conta LangSmith com handle público, chave de API do provedor de LLM).

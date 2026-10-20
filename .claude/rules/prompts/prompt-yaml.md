@@ -23,7 +23,7 @@ bug_to_user_story_v2:
   version: "v2"
   created_at: "YYYY-MM-DD"
   tags: ["bug-analysis", "user-story", "product-management"]
-  techniques_applied: ["few-shot", "..."]   # no mínimo 2
+  techniques_applied: ["few-shot", "role-prompting", "chain-of-thought"]
 ```
 
 - Campos validados por `validate_prompt_structure` (em `src/utils.py`): `description`, `system_prompt` não vazio,
@@ -44,14 +44,15 @@ bug_to_user_story_v2:
 - Separação System vs User: persona, instruções, regras, formato e exemplos no system; apenas o relato no user.
 - Role Prompting: persona explícita iniciando com "Você é" (ex.: "Você é um Product Manager sênior ...").
 - Instruções claras e específicas e regras explícitas de comportamento (o que fazer e o que não fazer).
-- Few-shot obrigatório: 2 a 3 exemplos de entrada e saída com níveis de complexidade diferentes.
+- Few-shot obrigatório: exatamente 3 exemplos de entrada e saída (simples, médio, complexo, nessa ordem).
   Marcar cada exemplo de forma consistente com `Exemplo N`, `Entrada:` e `Saída:`; os testes dependem desses marcadores.
 - Não copiar relatos nem referências do dataset para os exemplos: escrever exemplos próprios com a mesma estrutura.
-- Pelo menos uma técnica adicional além de Few-shot: Chain of Thought, Tree of Thought, Skeleton of Thought,
-  ReAct ou Role Prompting. Registrar todas as técnicas usadas em `techniques_applied`.
-- Tratamento de edge cases explícito no prompt, por exemplo: relato vago ou incompleto, vários problemas no mesmo
-  relato, relato com dados técnicos (logs, stack trace, endpoints), relato que não descreve um bug.
-- Não inventar dados ausentes no relato (valores, nomes, métricas); quando faltarem, usar descrição genérica.
+- Técnicas decididas: Few-shot, Role Prompting e Chain of Thought interno (etapas de análise que o modelo segue sem
+  exibir). Registrar todas em `techniques_applied`.
+- Edge cases obrigatórios com instrução explícita: relato vago ou incompleto; vários problemas no mesmo relato.
+- Não inventar dados ausentes no relato (valores, nomes, métricas); quando faltarem, usar descrição genérica ou
+  placeholder entre colchetes, como as referências fazem (ex.: `[nome do gateway de pagamento]`).
+- Detalhes do conteúdo e do formato: `specs/002-prompt-v2/spec.md`.
 
 ## Formato de saída esperado
 

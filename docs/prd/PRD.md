@@ -1,979 +1,606 @@
-# PRD: Pipeline de Pull, Otimização, Publicação e Avaliação de Prompts
+# PRD: Prompt Pull, Optimization, Publishing and Evaluation Pipeline
 
-## 1. Identificação e controle do documento
+## 1. Document control
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| Produto / projeto | `mba-ia-pull-evaluation-prompt`: Desafio 2 do MBA em IA (Full Cycle), "Otimização e Avaliação de Prompts com LangChain e LangSmith" |
-| Título do documento | Product Requirements Document (PRD) |
-| Versão | 0.1 |
-| Status | Rascunho, sem aprovação formal |
-| Data da última atualização | 2026-10-13 |
-| Responsável pelo produto | Pendente de definição (ver Q-011) |
-| Objetivo do documento | Ser a fonte de referência do o quê, por quê e para quem do produto, com requisitos rastreáveis e verificáveis, para orientar specs, documentos de fase, desenvolvimento e testes |
+| Product / project | `mba-ia-pull-evaluation-prompt`: Challenge 2 of the AI MBA (Full Cycle), "Prompt Optimization and Evaluation with LangChain and LangSmith" |
+| Document | Product Requirements Document (PRD) |
+| Version | 0.2 |
+| Status | Draft, pending approval |
+| Last updated | 2026-10-19 |
+| Product owner / approver | Marcos Fonseca (assumed during discovery; see Q-011) |
+| Purpose | Single source of truth for the what, why and for whom of the product, with traceable and verifiable requirements that guide specs, phase documents, development and tests |
 
-### 1.1. Fontes utilizadas
+### 1.1. Sources
 
-| Fonte | Uso |
+| Source | Use |
 |---|---|
-| Documento de contexto e requisitos do desafio, fornecido pelo usuário | Fonte primária de requisitos |
-| [`CLAUDE.md`](../../CLAUDE.md) e rules em `.claude/rules/` | Restrições, decisões estabelecidas, idioma e processo |
-| Repositório base `devfullcycle/mba-ia-pull-evaluation-prompt` (README, `.env.example`, `requirements.txt`, `src/evaluate.py`, `src/metrics.py`, `src/utils.py`, esqueletos, `prompts/bug_to_user_story_v1.yml`, `datasets/bug_to_user_story.jsonl`) | Comportamento já existente dos componentes prontos e formato dos dados de avaliação |
+| Challenge statement (`README.md` of the base repository) | Primary source of requirements |
+| [`CLAUDE.md`](../../CLAUDE.md) and rules in `.claude/rules/` | Constraints, established decisions, language and process |
+| Base repository code: `src/evaluate.py`, `src/metrics.py`, `src/utils.py`, skeletons, `.env.example`, `prompts/bug_to_user_story_v1.yml`, `datasets/bug_to_user_story.jsonl` | Behavior of the ready-made components and format of the evaluation data |
+| Discovery interview with the product owner (2026-10-13 to 2026-10-19) | Decisions recorded in section 17.1 |
+| Official Gemini API documentation and the developer's Google AI Studio quota page (2026-10-19) | Model choice ([ADR-001](../adr/ADR-001-llm-provider-and-models.md)) |
 
-### 1.2. Convenções
+### 1.2. Conventions
 
-- **Confirmado:** consta explicitamente em uma das fontes.
-- **Existente:** comportamento já implementado nos componentes prontos do repositório base, que não devem ser alterados.
-- **Premissa / hipótese:** considerado verdadeiro provisoriamente; precisa de validação.
-- **Pendente:** decisão ou informação ausente, registrada em [Questões em aberto](#17-questões-em-aberto-e-decisões-pendentes).
+- **Confirmed:** explicitly stated in a source.
+- **Existing:** behavior already implemented in the ready-made components, which must not be changed.
+- **Decided:** settled by the product owner during discovery (section 17.1).
+- **Assumption:** provisionally true; needs validation.
+- **Pending:** missing decision or information, listed in section 17.2.
 
-Siglas: PRD (Product Requirements Document), MVP (Minimum Viable Product), LLM (Large Language Model), CLI (Command Line Interface), YAML (formato de arquivo de dados), Hub (LangSmith Prompt Hub), F1 (média harmônica entre precisão e cobertura).
+Acronyms: PRD, MVP, LLM, CLI, YAML, Hub (LangSmith Prompt Hub), F1 (harmonic mean of precision and recall), RPM / RPD (requests per minute / per day).
 
-## 2. Resumo executivo
+## 2. Executive summary
 
-O produto é um conjunto de rotinas de linha de comando que obtém um prompt de baixa qualidade publicado no LangSmith Prompt Hub, permite produzir uma versão otimizada desse prompt com técnicas de engenharia de prompt, publica a versão otimizada no Hub e mede sua qualidade de forma automatizada contra um conjunto fixo de 15 exemplos.
+The product is a set of command-line routines that pull a low-quality prompt from the LangSmith Prompt Hub, support writing an optimized version with prompt engineering techniques, publish the optimized version to the Hub and measure its quality automatically against a fixed set of 15 examples.
 
-O prompt em questão transforma relatos de bugs em User Stories com critérios de aceitação. A versão original (`bug_to_user_story_v1`) tem defeitos conhecidos: instruções vagas, ausência de exemplos, ausência de persona e o relato de bug duplicado no prompt de sistema e no de usuário.
+The prompt turns bug reports into User Stories with acceptance criteria. The original version (`bug_to_user_story_v1`) has known defects: vague instructions, a vague persona ("an assistant"), no examples, and the bug report duplicated in the system and user prompts.
 
-Usuários principais:
-- o desenvolvedor que executa o desafio;
-- o avaliador do desafio, que verifica a entrega.
+Users:
+- the developer who runs the challenge;
+- the challenge reviewer, who verifies the delivery.
 
-O valor entregue é um ciclo reprodutível de "obter, otimizar, publicar e medir" que transforma a qualidade de um prompt em números comparáveis entre iterações, com evidências públicas.
+Value: a reproducible "pull, optimize, publish, measure" cycle that turns prompt quality into numbers comparable across iterations, with public evidence.
 
-**Objetivo principal da primeira versão:** o prompt `{handle}/bug_to_user_story_v2` obter nota maior ou igual a 0.8 em cada uma das cinco métricas (Helpfulness, Correctness, F1-Score, Clarity, Precision) e na média. A entrega também precisa estar documentada e com evidências verificáveis por terceiros.
+**Main objective:** the prompt `{handle}/bug_to_user_story_v2` scores 0.8 or higher on each of the five metrics (Helpfulness, Correctness, F1-Score, Clarity, Precision) and on their average, with documented and publicly verifiable evidence.
 
-## 3. Contexto e problema de negócio
+## 3. Context and business problem
 
-### 3.1. Cenário atual (fatos)
+### 3.1. Current situation (facts)
 
-- O repositório base já fornece:
-  - o dataset de avaliação com 15 relatos de bugs (5 simples, 7 médios e 3 complexos, conforme os metadados do dataset);
-  - o script de avaliação com as cinco métricas;
-  - funções auxiliares;
-  - esqueletos dos scripts de pull, push e testes.
-- O prompt semente `leonanluppi/bug_to_user_story_v1` está publicado no Hub. O próprio arquivo v1 declara que seus problemas são intencionais.
-- A avaliação é feita por LLM juiz: F1-Score, Clarity e Precision são julgadas por um modelo de avaliação. Helpfulness e Correctness são derivadas dessas três.
-- O provedor e os modelos de LLM não são fixados pelo desafio. Devem ser escolhidos conforme a documentação oficial vigente do provedor.
+- The base repository provides:
+  - the evaluation dataset with 15 bug reports (5 simple, 7 medium, 3 complex, per the dataset metadata);
+  - the evaluation script with the five metrics;
+  - helper functions;
+  - skeletons of the pull, push and test scripts.
+- The seed prompt `leonanluppi/bug_to_user_story_v1` is published on the Hub. The v1 file states that its defects are intentional.
+- Evaluation uses an LLM judge: F1-Score, Clarity and Precision are scored by the evaluation model; Helpfulness and Correctness are derived from them.
+- The judge compares each answer with the dataset reference answer. Precision penalizes unrequested information; Clarity rewards conciseness (`src/metrics.py`).
+- Any judge failure (quota, network, unparseable JSON) is recorded as score 0.0 for that example without stopping the run (`src/metrics.py`).
+- Generation and judging run with temperature 0 (`src/evaluate.py`, `src/metrics.py`).
 
-### 3.2. Dores identificadas
+### 3.2. Pain points
 
-| ID | Problema | Tipo |
+| ID | Problem | Type |
 |---|---|---|
-| PB-01 | O prompt v1 gera User Stories de baixa qualidade por instruções vagas, falta de exemplos, falta de persona e duplicação da variável de entrada | Fato (declarado no arquivo v1) |
-| PB-02 | Não há como afirmar que um prompt é melhor que outro sem medição objetiva, repetível e comparável entre iterações | Fato (motivação do desafio) |
-| PB-03 | O avaliador da entrega não tem acesso ao workspace privado do LangSmith do desenvolvedor; o link de experimento impresso pela avaliação só abre para quem tem acesso ao workspace | Fato |
-| PB-04 | Requisitos estruturais do prompt (persona, exemplos, técnicas, ausência de pendências) podem ser esquecidos durante as iterações | Fato (motivo dos testes obrigatórios) |
+| PB-01 | The v1 prompt produces low-quality User Stories: vague instructions, vague persona, no examples, duplicated input variable | Fact (stated in the v1 file) |
+| PB-02 | There is no objective, repeatable and comparable way to tell whether one prompt is better than another | Fact (challenge motivation) |
+| PB-03 | The reviewer has no access to the developer's private LangSmith workspace; the experiment link printed by the evaluation only opens inside the workspace | Fact |
+| PB-04 | Structural requirements of the prompt (persona, examples, techniques, no pending markers) can be forgotten during iterations | Fact (reason for the mandatory tests) |
 
-As notas do v1 exibidas no material do desafio (0.45 a 0.52) são declaradas como **apenas ilustrativas**. Não existe linha de base medida do v1 (ver Q-005).
+The v1 scores shown in the challenge material (0.45 to 0.52) are declared illustrative only. No measured v1 baseline will be produced (Q-005, decided).
 
-### 3.3. Consequências do problema
+### 3.3. Consequences
 
-- User Stories imprecisas ou incompletas levam a requisitos mal compreendidos pelo time de desenvolvimento. Hipótese de contexto: a descrição do v1 cita "tarefas para desenvolvedores", mas o impacto não é medido pelo produto.
-- Sem medição, ajustes no prompt são feitos por tentativa e erro, sem saber se melhoraram ou pioraram o resultado.
-- Sem evidências públicas, a entrega não pode ser verificada pelo avaliador.
+- Imprecise or incomplete User Stories lead to misunderstood requirements (assumption derived from the v1 description; not measured by the product).
+- Without measurement, prompt changes are trial and error.
+- Without public evidence, the reviewer cannot verify the delivery.
 
-### 3.4. Oportunidade
+### 3.4. Opportunity
 
-Aplicar técnicas de engenharia de prompt (Few-shot obrigatório e ao menos uma técnica adicional) e um ciclo de avaliação automatizado para elevar a qualidade do prompt de forma mensurável e documentada.
+Apply prompt engineering techniques (mandatory Few-shot plus at least one additional technique) and an automated evaluation cycle to raise prompt quality measurably and with documentation.
 
-### 3.5. Declaração do problema
+### 3.5. Problem statement
 
-O prompt `bug_to_user_story_v1` não produz User Stories com a qualidade exigida. Falta ao desenvolvedor um ciclo reprodutível para versionar, publicar e medir prompts que comprove, com evidências verificáveis por terceiros, que a versão otimizada atinge nota mínima de 0.8 em todas as métricas.
+The `bug_to_user_story_v1` prompt does not produce User Stories of the required quality. The developer lacks a reproducible cycle to version, publish and measure prompts that proves, with evidence verifiable by third parties, that the optimized version reaches at least 0.8 on every metric.
 
-## 4. Visão do produto e proposta de valor
+## 4. Product vision and value proposition
 
-- **Visão:** tratar prompts como artefatos versionados e mensuráveis, cuja qualidade é demonstrada por avaliação automatizada e não por percepção subjetiva.
-- **Proposta de valor:** com poucos comandos, o desenvolvedor obtém o prompt base, publica versões otimizadas e recebe notas objetivas por métrica e por exemplo, com histórico de experimentos comparável no LangSmith.
-- **Benefícios esperados:**
-  - qualidade do prompt comprovada por métricas;
-  - iterações comparáveis lado a lado;
-  - conformidade estrutural verificada automaticamente;
-  - entrega auditável por link público.
-- **Objetivos do produto:**
+- **Vision:** treat prompts as versioned, measurable artifacts whose quality is demonstrated by automated evaluation, not subjective perception.
+- **Value proposition:** with a few commands, the developer pulls the base prompt, publishes optimized versions and gets objective scores per metric and per example, with an experiment history comparable in LangSmith.
 
-| ID | Objetivo |
+| ID | Objective |
 |---|---|
-| OBJ-01 | O prompt v2 publicado atinge nota maior ou igual a 0.8 em cada uma das cinco métricas e na média |
-| OBJ-02 | Disponibilizar um ciclo reprodutível de obtenção, publicação versionada e avaliação de prompts |
-| OBJ-03 | Verificar automaticamente que o prompt v2 atende aos requisitos estruturais de engenharia de prompt do desafio |
-| OBJ-04 | Disponibilizar documentação e evidências públicas que permitam ao avaliador verificar e reproduzir a entrega |
+| OBJ-01 | The published v2 prompt scores >= 0.8 on each of the five metrics and on their average |
+| OBJ-02 | Provide a reproducible cycle of pulling, versioned publishing and evaluation of prompts |
+| OBJ-03 | Automatically verify that the v2 prompt meets the challenge's structural prompt engineering requirements |
+| OBJ-04 | Provide documentation and public evidence that allow the reviewer to verify and reproduce the delivery |
 
-## 5. Público-alvo e personas
+## 5. Target users and personas
 
-Não há dados demográficos ou comportamentais nas fontes. Foram definidos perfis funcionais.
+No demographic data exists in the sources; functional profiles were defined.
 
-| ID | Perfil | Objetivos | Necessidades | Dificuldades | Uso do produto | Origem |
+| ID | Profile | Goals | Needs | Difficulties | Product use | Origin |
 |---|---|---|---|---|---|---|
-| P1 | Desenvolvedor do desafio (operador) | Atingir aprovação em todas as métricas e entregar o desafio | Obter o prompt base, publicar versões, medir notas e comparar iterações | Limites de requisições de planos gratuitos de LLM; variação das notas de LLM juiz; escolha de modelos sem orientação fixa | Executa pull, edita o v2, executa testes, push e avaliação; gera o link público e documenta | Confirmado |
-| P2 | Avaliador do desafio | Verificar se a entrega cumpre os requisitos | Ver técnicas aplicadas, notas maiores ou iguais a 0.8, dataset, execuções e traces sem acesso ao workspace privado; reproduzir a execução | Link de experimento privado não abre para terceiros | Lê o README, acessa o link público do dataset e inspeciona o repositório | Confirmado (entregáveis e evidências exigidos) |
-| P3 | Time de produto e desenvolvimento que recebe relatos de bugs (beneficiário indireto) | Receber User Stories claras a partir de relatos | User Story com persona, objetivo, benefício e critérios de aceitação | Não identificadas nas fontes | Não interage com o produto; consome a saída do prompt | Hipótese, derivada da descrição do prompt v1; não validada |
+| P1 | Challenge developer (operator) | Pass all metrics and deliver the challenge | Pull the base prompt, publish versions, measure scores, compare iterations | Free-tier quotas; LLM-judge score variation; model choice without fixed guidance | Runs pull, edits v2, runs tests, push and evaluation; creates the public link; documents | Confirmed |
+| P2 | Challenge reviewer | Verify that the delivery meets the requirements | See techniques, scores >= 0.8, dataset, runs and traces without workspace access; reproduce the run | Private experiment link does not open for third parties | Reads the README, opens the public dataset link, inspects the repository | Confirmed |
+| P3 | Product and development team receiving bug reports (indirect beneficiary) | Get clear User Stories from reports | User Story with persona, goal, benefit and acceptance criteria | Not identified | Does not interact with the product | Assumption from the v1 description |
 
-## 6. Objetivos e critérios de sucesso
+## 6. Success criteria
 
-### 6.1. Métricas de resultado
+### 6.1. Outcome metrics
 
-Fonte de dados para KPI-01 a KPI-06: saída de `src/evaluate.py` e feedback gravado no experimento do LangSmith. Prazo de avaliação: pendente (ver Q-010).
+Data source for KPI-01 to KPI-06: output of `src/evaluate.py` and the feedback recorded in the LangSmith experiment. A single valid approved run is enough (BR-018, Q-010).
 
-| ID | Indicador | Objetivo | Método de cálculo | Meta |
+| ID | Indicator | Objective | Calculation | Target |
 |---|---|---|---|---|
-| KPI-01 | Helpfulness | OBJ-01 | Média, nos 15 exemplos, de (Clarity + Precision) / 2 por exemplo | >= 0.8 |
-| KPI-02 | Correctness | OBJ-01 | Média, nos 15 exemplos, de (F1-Score + Precision) / 2 por exemplo | >= 0.8 |
-| KPI-03 | F1-Score | OBJ-01 | Média nos 15 exemplos de 2·P·R / (P + R), com P e R atribuídos pelo LLM juiz | >= 0.8 |
-| KPI-04 | Clarity | OBJ-01 | Média nos 15 exemplos da nota do LLM juiz (organização, linguagem direta, ausência de ambiguidade, concisão) | >= 0.8 |
-| KPI-05 | Precision | OBJ-01 | Média nos 15 exemplos da nota do LLM juiz (sem alucinações, foco no pedido, correção em relação à referência) | >= 0.8 |
-| KPI-06 | Média geral | OBJ-01 | Média aritmética de KPI-01 a KPI-05 | >= 0.8 |
+| KPI-01 | Helpfulness | OBJ-01 | Mean over the 15 examples of (Clarity + Precision) / 2 | >= 0.8 |
+| KPI-02 | Correctness | OBJ-01 | Mean over the 15 examples of (F1-Score + Precision) / 2 | >= 0.8 |
+| KPI-03 | F1-Score | OBJ-01 | Mean over the 15 examples of 2·P·R / (P + R), P and R scored by the judge | >= 0.8 |
+| KPI-04 | Clarity | OBJ-01 | Mean over the 15 examples of the judge score (organization, plain language, no ambiguity, conciseness) | >= 0.8 |
+| KPI-05 | Precision | OBJ-01 | Mean over the 15 examples of the judge score (no hallucinations, focus, correctness against the reference) | >= 0.8 |
+| KPI-06 | Overall average | OBJ-01 | Arithmetic mean of KPI-01 to KPI-05 | >= 0.8 |
 
-### 6.2. Métricas operacionais
+### 6.2. Operational metrics
 
-| ID | Indicador | Objetivo | Método de cálculo | Fonte | Meta |
+| ID | Indicator | Objective | Calculation | Source | Target |
 |---|---|---|---|---|---|
-| KPI-07 | Testes de validação estrutural aprovados | OBJ-03 | Testes aprovados / testes executados | Saída do `pytest` | 6 de 6 testes obrigatórios aprovados |
-| KPI-08 | Iterações até a aprovação | OBJ-02 | Número de ciclos editar, publicar e avaliar até atingir OBJ-01 | Experimentos no LangSmith | Sem meta. O material indica que 3 a 5 iterações são esperadas, como referência e não como compromisso |
-| KPI-09 | Completude das evidências | OBJ-04 | Itens de evidência presentes / itens exigidos (FR-036) | Link público e README | 100% dos itens exigidos |
+| KPI-07 | Structural validation tests passing | OBJ-03 | Passed / executed | `pytest` output | 6 of 6 mandatory tests (plus any additional test) |
+| KPI-08 | Iterations until approval | OBJ-02 | Valid edit-publish-evaluate cycles until OBJ-01; runs discarded under BR-018 do not count | LangSmith experiments | No target; 3 to 5 iterations expected as reference |
+| KPI-09 | Evidence completeness | OBJ-04 | Evidence items present / items required (FR-036) | Public link and README | 100% |
 
-## 7. Escopo do produto
+## 7. Product scope
 
-| ID | Grupo funcional | Descrição | Necessidade atendida | Capacidades | Usuários | Prioridade | Dependências |
-|---|---|---|---|---|---|---|---|
-| G1 | Obtenção do prompt base | Trazer o prompt semente do Hub para o repositório | PB-01 (analisar o ponto de partida) | Validar configuração, obter o prompt, salvar localmente em YAML, informar falhas | P1 | Must Have | Conta e chave do LangSmith; prompt semente disponível |
-| G2 | Prompt otimizado v2 | Manter a versão otimizada em arquivo versionado | PB-01 | Persona, instruções, regras, Few-shot, técnica adicional, edge cases, separação sistema e usuário, formato de saída, metadados | P1 | Must Have | G1 (análise do v1) |
-| G3 | Publicação versionada | Publicar o v2 no Hub como público, com metadados | PB-02, PB-03 | Ler, validar, publicar com identificador versionado, informar resultado | P1 | Must Have | G2; handle público do Hub |
-| G4 | Avaliação de qualidade | Medir o v2 publicado contra o dataset | PB-02 | Experimento por execução, 5 métricas por exemplo, status de aprovação, link do experimento | P1 | Must Have (existente, não implementar) | G3; chaves e modelos de LLM configurados |
-| G5 | Validação estrutural automatizada | Verificar requisitos estruturais do v2 | PB-04 | 6 verificações obrigatórias executáveis por um comando | P1, P2 | Must Have | G2 |
-| G6 | Documentação e evidências da entrega | Permitir ao avaliador verificar e reproduzir | PB-03 | README com seções obrigatórias, link público do dataset, screenshots, repositório público em fork | P1, P2 | Must Have | G4 com aprovação |
+All groups are Must Have: the challenge defines them as mandatory deliverables.
 
-Todos os grupos são Must Have porque o material do desafio os define como entregáveis obrigatórios. Não há, nas fontes, funcionalidades opcionais que justifiquem Should Have ou Could Have, exceto as indicadas em 8.2.
+| ID | Group | Description | Need | Users | Dependencies |
+|---|---|---|---|---|---|
+| G1 | Base prompt pull | Bring the seed prompt from the Hub into the repository | PB-01 | P1 | LangSmith account and key; seed prompt available |
+| G2 | Optimized v2 prompt | Keep the optimized version in a versioned file | PB-01 | P1 | G1 (v1 analysis) |
+| G3 | Versioned publishing | Publish v2 to the Hub as public, with metadata | PB-02, PB-03 | P1 | G2; public Hub handle |
+| G4 | Quality evaluation | Measure the published v2 against the dataset | PB-02 | P1 | G3; LLM keys and models (Existing, do not implement) |
+| G5 | Automated structural validation | Check structural requirements of v2 | PB-04 | P1, P2 | G2 |
+| G6 | Delivery documentation and evidence | Let the reviewer verify and reproduce | PB-03 | P1, P2 | G4 approved |
 
-## 8. MVP e não objetivos (Non-Goals)
+## 8. MVP and non-goals
 
 ### 8.1. MVP
 
-O MVP corresponde à entrega completa do desafio: grupos G1 a G6, com os requisitos funcionais de prioridade Must Have.
+The MVP is the full challenge delivery: groups G1 to G6 with their Must Have requirements. It must allow checking OBJ-01 (KPI-01 to KPI-06), the structural requirements (KPI-07) and third-party verifiability (KPI-09).
 
-O MVP deve permitir avaliar:
-- se o v2 atinge OBJ-01 (KPI-01 a KPI-06);
-- se o v2 atende aos requisitos estruturais (KPI-07);
-- se a entrega é verificável por terceiros (KPI-09).
+Minimum usage requirements: LangSmith and LLM provider credentials configured, a public Hub handle, generation and evaluation models defined ([ADR-001](../adr/ADR-001-llm-provider-and-models.md)).
 
-Requisitos mínimos de uso:
-- credenciais do LangSmith e do provedor de LLM configuradas;
-- handle público do Hub existente;
-- modelos de resposta e de avaliação definidos.
+### 8.2. Should Have items allowed by the sources
 
-### 8.2. Itens fora do MVP, permitidos pelas fontes
+| Item | Basis |
+|---|---|
+| Additional validation tests beyond the 6 mandatory ones (FR-039) | The challenge asks for "at least" 6 tests |
+| Printing the published prompt URL at the end of the push (FR-020) | The skeleton hint returns that URL |
 
-| Item | Classificação | Fundamento |
-|---|---|---|
-| Testes de validação adicionais aos 6 obrigatórios | Should Have | O material pede "no mínimo" 6 testes |
-| Exibição do endereço do prompt publicado ao final do push | Should Have | A dica de implementação do esqueleto retorna esse endereço; o material pede verificar a publicação no dashboard |
+### 8.3. Non-goals
 
-### 8.3. Não objetivos
+- Changing the dataset, metrics, threshold, evaluation script or helpers to improve scores.
+- Evaluating prompts other than `{handle}/bug_to_user_story_v2`.
+- Hard-coding the LLM provider or model.
+- Using a database.
+- Generating User Stories for real operational use.
 
-- Alterar o dataset, as métricas, o limite de aprovação, o script de avaliação ou as funções auxiliares para melhorar notas.
-- Avaliar outros prompts além de `{handle}/bug_to_user_story_v2` (o script de avaliação existente avalia somente esse prompt).
-- Fixar provedor ou modelo de LLM no código.
-- Utilizar banco de dados.
-- Gerar User Stories para uso operacional real. O produto mede a qualidade do prompt; não é uma ferramenta de produção para times de produto (P3 é beneficiário apenas indireto).
+## 9. Functional requirements
 
-## 9. Requisitos funcionais
+Actor "System" means the product routines. All requirements are Must Have unless stated otherwise.
 
-Prioridades conforme a seção 7. Ator "Sistema" designa as rotinas do produto.
+### 9.1. G1: Base prompt pull
 
-### 9.1. G1: Obtenção do prompt base
-
-**FR-001: Validar configuração antes da obtenção**
-- Descrição: antes de contatar o Hub, o sistema verifica se as credenciais do LangSmith estão configuradas.
-- Justificativa: evitar falhas sem diagnóstico (PB-02).
-- Ator: P1 / Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: BR-014.
-- Critérios de aceitação:
-  - com credencial ausente, o sistema lista as variáveis faltantes em português;
-  - o sistema encerra com status de falha e não contata o Hub.
-- Dependências: nenhuma.
-
-**FR-002: Obter o prompt semente do Hub**
-- Descrição: o sistema obtém o prompt `leonanluppi/bug_to_user_story_v1` do LangSmith Prompt Hub.
-- Justificativa: PB-01.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: BR-013, BR-015.
-- Critérios de aceitação: com credenciais válidas, o sistema obtém as mensagens de sistema e de usuário do prompt semente.
-- Dependências: FR-001.
-
-**FR-003: Persistir o prompt base localmente**
-- Descrição: o sistema salva o prompt obtido em `prompts/bug_to_user_story_v1.yml`, em YAML, contendo o prompt de sistema, o prompt de usuário e os metadados disponíveis.
-- Justificativa: permitir análise local do ponto de partida.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma além do formato YAML (restrição R-03).
-- Critérios de aceitação:
-  - após a execução, o arquivo existe e é um YAML válido;
-  - o arquivo contém os textos de sistema e de usuário iguais aos do prompt obtido.
-- Dependências: FR-002.
-
-**FR-004: Informar falha na obtenção**
-- Descrição: se a obtenção falhar, o sistema informa o motivo em português e encerra com status de falha.
-- Justificativa: diagnóstico para P1.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: com erro de rede, credencial inválida ou prompt inexistente, a mensagem descreve o erro e o status de saída indica falha.
-- Dependências: FR-002.
-
-### 9.2. G2: Prompt otimizado v2
-
-**FR-005: Manter o prompt v2 em arquivo versionado com metadados**
-- Descrição: o prompt otimizado existe em `prompts/bug_to_user_story_v2.yml`.
-- Justificativa: PB-01, OBJ-03.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-008.
-- Critérios de aceitação: o arquivo contém descrição, prompt de sistema, prompt de usuário, versão, tags e a lista de técnicas aplicadas.
-- Dependências: nenhuma.
-
-**FR-006: Definir persona no prompt de sistema**
-- Descrição: o prompt de sistema define explicitamente o papel assumido pelo modelo (ex.: "Você é um Product Manager").
-- Justificativa: requisito de Role Prompting e teste obrigatório.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: o prompt de sistema contém uma definição de persona verificável por FR-027.
-- Dependências: FR-005.
-
-**FR-007: Conter instruções claras e regras explícitas de comportamento**
-- Descrição: o prompt de sistema descreve a tarefa de forma específica e lista regras explícitas do que o modelo deve e não deve fazer.
-- Justificativa: corrigir instruções vagas do v1 (PB-01).
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: o prompt de sistema contém uma seção identificável de regras de comportamento.
-- Dependências: FR-005.
-
-**FR-008: Conter exemplos de entrada e saída (Few-shot)**
-- Descrição: o prompt de sistema contém exemplos de relato de bug (entrada) e da User Story esperada (saída).
-- Justificativa: técnica obrigatória (BR-008).
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-008.
-- Critérios de aceitação: o prompt contém ao menos um par entrada e saída identificável. A quantidade mínima não está definida nas fontes; o material recomenda 2 a 3 exemplos (ver Q-012).
-- Dependências: FR-005.
-
-**FR-009: Aplicar ao menos uma técnica adicional**
-- Descrição: além de Few-shot, o prompt aplica ao menos uma das técnicas: Chain of Thought, Tree of Thought, Skeleton of Thought, ReAct ou Role Prompting.
-- Justificativa: BR-008.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-008.
-- Critérios de aceitação:
-  - a lista de técnicas aplicadas contém Few-shot e ao menos uma técnica da lista;
-  - a aplicação da técnica é identificável no texto do prompt.
-- Dependências: FR-005.
-
-**FR-010: Tratar casos de borda**
-- Descrição: o prompt instrui o comportamento esperado diante de relatos que fogem do caso típico.
-- Justificativa: requisito do prompt otimizado.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: o prompt contém instruções explícitas para casos de borda. A lista mínima de casos de borda não está definida nas fontes (ver Q-013).
-- Dependências: FR-005.
-
-**FR-011: Separar prompt de sistema e prompt de usuário**
-- Descrição: instruções, persona, regras e exemplos ficam no prompt de sistema. O relato de bug é recebido exclusivamente no prompt de usuário.
-- Justificativa: corrigir a duplicação do v1 (PB-01).
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-009.
-- Critérios de aceitação:
-  - a variável de entrada aparece apenas no prompt de usuário;
-  - o prompt de sistema não referencia a variável de entrada.
-- Dependências: FR-005.
-
-**FR-012: Exigir formato de saída de User Story**
-- Descrição: o prompt exige que a saída siga o formato de User Story padrão ou Markdown.
-- Justificativa: teste obrigatório; alinhamento com as respostas de referência do dataset.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-016.
-- Critérios de aceitação: o prompt de sistema menciona explicitamente o formato de saída exigido. A escolha entre User Story padrão e Markdown está pendente (ver Q-006).
-- Dependências: FR-005.
-
-**FR-013: Não conter pendências de edição**
-- Descrição: o prompt não contém marcadores de pendência.
-- Justificativa: PB-04.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: o texto do prompt não contém `[TODO]`, nem a sequência `TODO` em maiúsculas no prompt de sistema.
-- Dependências: FR-005.
-
-**FR-014: Redigir o conteúdo do prompt em português**
-- Descrição: o texto do prompt enviado ao LLM está em português.
-- Justificativa: regra de idioma do projeto; o dataset está em português.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: instruções, regras e exemplos estão em português.
-- Dependências: FR-005.
-
-### 9.3. G3: Publicação versionada
-
-**FR-015: Ler o prompt v2 local**
-- Descrição: o sistema lê o prompt de `prompts/bug_to_user_story_v2.yml`.
-- Justificativa: OBJ-02.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: com arquivo ausente ou YAML inválido, o sistema informa o erro em português e encerra com status de falha, sem publicar.
-- Dependências: FR-005.
-
-**FR-016: Validar o prompt antes de publicar**
-- Descrição: o sistema valida a estrutura do prompt antes da publicação.
-- Justificativa: PB-04.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: BR-008.
-- Critérios de aceitação:
-  - prompt sem descrição, sem prompt de sistema, com prompt de sistema vazio, sem versão, com pendências ou com menos de 2 técnicas não é publicado;
-  - todos os erros encontrados são listados.
-- Dependências: FR-015.
-
-**FR-017: Publicar com identificador versionado**
-- Descrição: o sistema publica o prompt no Hub com o identificador `{handle}/bug_to_user_story_v2`.
-- Justificativa: OBJ-02; pré-requisito da avaliação.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: BR-005.
-- Critérios de aceitação: após a publicação, o prompt é localizável no Hub por esse identificador.
-- Dependências: FR-016.
-
-**FR-018: Publicar como público**
-- Descrição: o prompt publicado fica com visibilidade pública.
-- Justificativa: PB-03.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: BR-006.
-- Critérios de aceitação: o prompt é acessível por usuário sem acesso ao workspace.
-- Dependências: FR-017.
-
-**FR-019: Registrar metadados na publicação**
-- Descrição: a publicação inclui tags, descrição e técnicas utilizadas.
-- Justificativa: requisito do desafio.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: tags, descrição e técnicas são visíveis no Hub para o prompt publicado. A forma de exibir as técnicas está pendente (ver Q-014).
-- Dependências: FR-017.
-
-**FR-020: Informar o resultado da publicação**
-- Descrição: o sistema informa sucesso ou falha. Em caso de falha por handle inexistente, orienta a criar o handle tornando um prompt público na interface do LangSmith.
-- Justificativa: diagnóstico para P1.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: BR-005.
-- Critérios de aceitação:
-  - o status de saída indica sucesso ou falha;
-  - a mensagem é em português.
-- Dependências: FR-017.
-
-### 9.4. G4: Avaliação de qualidade (existente)
-
-Os requisitos FR-021 a FR-024 descrevem o comportamento já implementado em `src/evaluate.py`. Não devem ser implementados nem alterados (BR-003). Servem para verificação e rastreabilidade.
-
-**FR-021: Avaliar o prompt publicado como experimento**
-- Descrição: o sistema obtém do Hub o prompt `{handle}/bug_to_user_story_v2` e o executa contra os 15 exemplos do dataset de avaliação. Cada execução gera um experimento ligado ao dataset.
-- Justificativa: PB-02.
-- Ator: Sistema.
-- Prioridade: Must Have (existente).
-- Regras de negócio: BR-007, BR-012.
-- Critérios de aceitação: cada execução cria um novo experimento com 15 execuções do prompt.
-- Dependências: FR-017.
-
-**FR-022: Calcular e registrar cinco métricas por exemplo**
-- Descrição: para cada exemplo, o sistema calcula F1-Score, Clarity e Precision por LLM juiz, deriva Helpfulness e Correctness e grava as cinco notas como feedback no experimento.
-- Justificativa: PB-02.
-- Ator: Sistema.
-- Prioridade: Must Have (existente).
-- Regras de negócio: BR-002.
-- Critérios de aceitação: cada exemplo do experimento tem as cinco notas, entre 0.0 e 1.0.
-- Dependências: FR-021.
-
-**FR-023: Determinar o status de aprovação**
-- Descrição: o sistema exibe as médias das cinco métricas e a média geral, e indica APROVADO ou REPROVADO. Em caso de reprovação, lista as métricas abaixo do limite.
-- Justificativa: OBJ-01.
-- Ator: Sistema.
-- Prioridade: Must Have (existente).
-- Regras de negócio: BR-001.
-- Critérios de aceitação: o status segue BR-001.
-- Dependências: FR-022.
-
-**FR-024: Exibir o endereço do experimento**
-- Descrição: ao final, o sistema exibe o endereço do experimento no LangSmith.
-- Justificativa: diagnóstico e comparação de iterações.
-- Ator: Sistema.
-- Prioridade: Must Have (existente).
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: o endereço é exibido quando o experimento é criado.
-- Dependências: FR-021.
-
-### 9.5. G5: Validação estrutural automatizada
-
-**FR-025: Executar a validação estrutural por um único comando**
-- Descrição: as verificações estruturais do prompt v2 são executadas por um único comando de testes.
-- Justificativa: PB-04, OBJ-03.
-- Ator: P1, P2.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação:
-  - o comando executa as 6 verificações FR-026 a FR-031;
-  - o comando informa o resultado de cada uma.
-- Dependências: FR-005.
-
-**FR-026: Verificar a existência do prompt de sistema**
-- Descrição: verifica que o prompt de sistema existe e não está vazio.
-- Justificativa: teste obrigatório `test_prompt_has_system_prompt`.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: falha se o campo estiver ausente ou contiver apenas espaços.
-- Dependências: FR-025.
-
-**FR-027: Verificar a definição de persona**
-- Descrição: verifica que o prompt define uma persona.
-- Justificativa: teste obrigatório `test_prompt_has_role_definition`.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: falha se não houver definição de persona no prompt de sistema.
-- Dependências: FR-025, FR-006.
-
-**FR-028: Verificar a exigência de formato**
-- Descrição: verifica que o prompt exige formato Markdown ou User Story padrão.
-- Justificativa: teste obrigatório `test_prompt_mentions_format`.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: falha se o prompt não mencionar o formato exigido.
-- Dependências: FR-025, FR-012.
-
-**FR-029: Verificar a presença de exemplos Few-shot**
-- Descrição: verifica que o prompt contém exemplos de entrada e saída.
-- Justificativa: teste obrigatório `test_prompt_has_few_shot_examples`.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: falha se não houver exemplos de entrada e saída identificáveis.
-- Dependências: FR-025, FR-008.
-
-**FR-030: Verificar a ausência de pendências**
-- Descrição: verifica que o prompt não contém `[TODO]`.
-- Justificativa: teste obrigatório `test_prompt_no_todos`.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: falha se `[TODO]` estiver presente.
-- Dependências: FR-025, FR-013.
-
-**FR-031: Verificar o número mínimo de técnicas**
-- Descrição: verifica, pelos metadados do YAML, que ao menos 2 técnicas foram listadas.
-- Justificativa: teste obrigatório `test_minimum_techniques`.
-- Ator: Sistema.
-- Prioridade: Must Have.
-- Regras de negócio: BR-008.
-- Critérios de aceitação: falha se a lista de técnicas tiver menos de 2 itens.
-- Dependências: FR-025.
-
-### 9.6. G6: Documentação e evidências da entrega
-
-**FR-032: Documentar as técnicas aplicadas**
-- Descrição: o README contém a seção "Técnicas Aplicadas (Fase 2)".
-- Justificativa: entregável obrigatório; necessidade de P2.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: a seção lista as técnicas escolhidas e, para cada uma, a justificativa e um exemplo prático de aplicação.
-- Dependências: FR-009.
-
-**FR-033: Documentar os resultados finais**
-- Descrição: o README contém a seção "Resultados Finais".
-- Justificativa: entregável obrigatório.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-011.
-- Critérios de aceitação: a seção contém o link público do dataset de avaliação com os experimentos, screenshots com as notas maiores ou iguais a 0.8 e a comparação entre v1 e v2 (o que mudou e por quê).
-- Dependências: FR-023, FR-035.
-
-**FR-034: Documentar como executar**
-- Descrição: o README contém a seção "Como Executar".
-- Justificativa: necessidade de reprodução por P2.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: a seção contém pré-requisitos, dependências e os comandos de cada fase do projeto.
-- Dependências: nenhuma.
-
-**FR-035: Disponibilizar link público do dataset de avaliação**
-- Descrição: um endereço público do dataset de avaliação, que expõe os experimentos executados contra ele, é gerado e registrado.
-- Justificativa: PB-03.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-011.
-- Critérios de aceitação: o endereço abre para um usuário sem acesso ao workspace.
-- Dependências: FR-021.
-
-**FR-036: Tornar visíveis as evidências exigidas**
-- Descrição: pelo link público ou por screenshots, ficam visíveis: o dataset com 15 exemplos, as execuções do v2 com notas maiores ou iguais a 0.8 e o tracing detalhado de ao menos 3 exemplos.
-- Justificativa: PB-03, OBJ-04.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: nenhuma.
-- Critérios de aceitação: os três itens são verificáveis por P2.
-- Dependências: FR-035.
-
-**FR-037: Entregar em repositório público derivado do repositório base**
-- Descrição: a entrega é um repositório público no GitHub, fork do repositório base.
-- Justificativa: entregável obrigatório.
-- Ator: P1.
-- Prioridade: Must Have.
-- Regras de negócio: BR-017.
-- Critérios de aceitação: o repositório é público, é fork de `devfullcycle/mba-ia-pull-evaluation-prompt` e contém o código implementado, o v2 completo e o README atualizado.
-- Dependências: G1 a G5.
-
-## 10. Histórias de usuário
-
-**US-001: Obter o prompt base**
-- História: Como desenvolvedor do desafio, quero obter localmente o prompt v1 publicado no Hub, para analisar seus defeitos e usá-lo como ponto de partida da otimização.
-- Necessidade: PB-01.
-- Prioridade: Must Have.
-- Requisitos: FR-001 a FR-004.
-- Critérios de aceitação:
-  - o arquivo do v1 é criado com o conteúdo do Hub;
-  - falhas são informadas com status de falha.
-- Dependências: credenciais do LangSmith.
-
-**US-002: Manter um prompt otimizado versionado**
-- História: Como desenvolvedor do desafio, quero manter o prompt v2 em arquivo com persona, regras, exemplos, técnica adicional e tratamento de casos de borda, para gerar User Stories de melhor qualidade que o v1.
-- Necessidade: PB-01.
-- Prioridade: Must Have.
-- Requisitos: FR-005 a FR-014.
-- Critérios de aceitação: o arquivo atende a FR-005 a FR-014 e passa nas verificações FR-026 a FR-031.
-- Dependências: US-001.
-
-**US-003: Validar o prompt antes de publicar**
-- História: Como desenvolvedor do desafio, quero validar automaticamente a estrutura do prompt v2, para garantir que ele atende aos requisitos mínimos do desafio antes de publicá-lo.
-- Necessidade: PB-04.
-- Prioridade: Must Have.
-- Requisitos: FR-025 a FR-031.
-- Critérios de aceitação: um único comando executa as 6 verificações e indica o resultado de cada uma.
-- Dependências: US-002.
-
-**US-004: Publicar o prompt otimizado**
-- História: Como desenvolvedor do desafio, quero publicar o v2 no Hub como público, com identificador versionado e metadados, para que ele possa ser avaliado e consultado.
-- Necessidade: PB-02, PB-03.
-- Prioridade: Must Have.
-- Requisitos: FR-015 a FR-020.
-- Critérios de aceitação:
-  - prompt inválido não é publicado;
-  - prompt válido fica público como `{handle}/bug_to_user_story_v2` com metadados.
-- Dependências: US-002; handle do Hub.
-
-**US-005: Medir a qualidade do prompt publicado**
-- História: Como desenvolvedor do desafio, quero avaliar o v2 publicado com cinco métricas objetivas, para saber se ele atinge o critério de aprovação.
-- Necessidade: PB-02.
-- Prioridade: Must Have.
-- Requisitos: FR-021 a FR-024.
-- Critérios de aceitação: a execução exibe as cinco notas, a média e o status conforme BR-001.
-- Dependências: US-004.
-
-**US-006: Iterar até a aprovação**
-- História: Como desenvolvedor do desafio, quero editar, republicar e reavaliar o v2 e comparar os experimentos, para atingir nota maior ou igual a 0.8 em todas as métricas.
-- Necessidade: PB-02.
-- Prioridade: Must Have.
-- Requisitos: FR-005 a FR-024.
-- Critérios de aceitação:
-  - cada ciclo gera um novo experimento comparável no LangSmith;
-  - o último ciclo atinge BR-001.
-- Dependências: US-004, US-005.
-
-**US-007: Verificar a entrega sem acesso ao workspace**
-- História: Como avaliador do desafio, quero acessar um link público com o dataset, as execuções e os traces, para verificar as notas sem acesso ao workspace do desenvolvedor.
-- Necessidade: PB-03.
-- Prioridade: Must Have.
-- Requisitos: FR-035, FR-036.
-- Critérios de aceitação: o link abre sem autenticação no workspace e mostra os itens de FR-036.
-- Dependências: US-006.
-
-**US-008: Compreender e reproduzir a solução**
-- História: Como avaliador do desafio, quero ler no README as técnicas aplicadas, os resultados e as instruções de execução, para avaliar a solução e reproduzi-la.
-- Necessidade: PB-03.
-- Prioridade: Must Have.
-- Requisitos: FR-032 a FR-034, FR-037.
-- Critérios de aceitação: o README contém as três seções obrigatórias com o conteúdo exigido, e o repositório atende a FR-037.
-- Dependências: US-006, US-007.
-
-## 11. Critérios de aceitação em Gherkin
-
-```gherkin
-# language: pt
-Funcionalidade: Obtenção do prompt base (FR-001 a FR-004)
-
-  Cenário: Obter o prompt semente com credenciais válidas
-    Dado que as credenciais do LangSmith estão configuradas
-    E o prompt "leonanluppi/bug_to_user_story_v1" está disponível no Hub
-    Quando o desenvolvedor executa a obtenção do prompt base
-    Então o arquivo "prompts/bug_to_user_story_v1.yml" é criado em YAML válido
-    E o arquivo contém os textos de sistema e de usuário do prompt obtido
-    E a execução termina com status de sucesso
-
-  Cenário: Credencial ausente
-    Dado que a chave de API do LangSmith não está configurada
-    Quando o desenvolvedor executa a obtenção do prompt base
-    Então o sistema lista em português as variáveis faltantes
-    E o Hub não é contatado
-    E a execução termina com status de falha
-
-  Cenário: Falha ao contatar o Hub
-    Dado que as credenciais estão configuradas
-    E o Hub não responde ou recusa a requisição
-    Quando o desenvolvedor executa a obtenção do prompt base
-    Então o sistema informa o motivo da falha em português
-    E a execução termina com status de falha
-```
-
-```gherkin
-# language: pt
-Funcionalidade: Validação estrutural do prompt v2 (FR-025 a FR-031)
-
-  Cenário: Prompt v2 conforme
-    Dado que o prompt v2 possui prompt de sistema não vazio
-    E define uma persona
-    E exige formato de User Story padrão ou Markdown
-    E contém exemplos de entrada e saída
-    E não contém "[TODO]"
-    E lista ao menos 2 técnicas nos metadados
-    Quando o desenvolvedor executa a validação estrutural
-    Então as 6 verificações são aprovadas
-
-  Cenário: Prompt v2 com uma única técnica listada
-    Dado que os metadados do prompt v2 listam apenas 1 técnica
-    Quando o desenvolvedor executa a validação estrutural
-    Então a verificação de número mínimo de técnicas falha
-    E o resultado indica qual verificação falhou
-
-  Cenário: Prompt v2 com pendência esquecida
-    Dado que o prompt v2 contém o marcador "[TODO]"
-    Quando o desenvolvedor executa a validação estrutural
-    Então a verificação de ausência de pendências falha
-```
-
-```gherkin
-# language: pt
-Funcionalidade: Publicação do prompt v2 (FR-015 a FR-020)
-
-  Cenário: Publicar prompt válido
-    Dado que o prompt v2 local é válido
-    E o handle público do Hub existe e está configurado
-    Quando o desenvolvedor executa a publicação
-    Então o prompt fica disponível no Hub como "{handle}/bug_to_user_story_v2"
-    E o prompt é público
-    E tags, descrição e técnicas utilizadas ficam registradas
-    E a execução termina com status de sucesso
-
-  Cenário: Bloquear publicação de prompt inválido
-    Dado que o prompt v2 local não possui o campo de versão
-    E lista menos de 2 técnicas
-    Quando o desenvolvedor executa a publicação
-    Então nenhum prompt é publicado
-    E todos os erros de validação são listados em português
-    E a execução termina com status de falha
-
-  Cenário: Handle do Hub inexistente
-    Dado que o prompt v2 local é válido
-    E o handle configurado não existe no Hub
-    Quando o desenvolvedor executa a publicação
-    Então a publicação falha
-    E o sistema orienta a criar o handle tornando um prompt público na interface do LangSmith
-
-  Cenário: Arquivo do prompt v2 ausente
-    Dado que o arquivo "prompts/bug_to_user_story_v2.yml" não existe
-    Quando o desenvolvedor executa a publicação
-    Então o sistema informa que o arquivo não foi encontrado
-    E nenhum prompt é publicado
-```
-
-```gherkin
-# language: pt
-Funcionalidade: Avaliação do prompt publicado (FR-021 a FR-024, BR-001)
-
-  Cenário: Aprovação com todas as métricas no limite ou acima
-    Dado que o prompt v2 foi publicado
-    E as médias obtidas são Helpfulness 0.85, Correctness 0.80, F1-Score 0.80, Clarity 0.90 e Precision 0.80
-    Quando o desenvolvedor executa a avaliação
-    Então o status exibido é "APROVADO"
-
-  Cenário: Reprovação com média alta e uma métrica abaixo do limite
-    Dado que o prompt v2 foi publicado
-    E as médias obtidas são Helpfulness 0.95, Correctness 0.87, F1-Score 0.79, Clarity 0.95 e Precision 0.95
-    Quando o desenvolvedor executa a avaliação
-    Então o status exibido é "REPROVADO"
-    E a métrica "f1_score" é listada como abaixo de 0.8
-
-  Cenário: Alteração local não publicada
-    Dado que o desenvolvedor alterou o prompt v2 local
-    E não executou a publicação após a alteração
-    Quando o desenvolvedor executa a avaliação
-    Então a versão avaliada é a última publicada no Hub, e não a alteração local
-
-  Cenário: Prompt v2 ainda não publicado
-    Dado que não existe "{handle}/bug_to_user_story_v2" no Hub
-    Quando o desenvolvedor executa a avaliação
-    Então o sistema informa que o prompt não foi encontrado
-    E orienta a executar a publicação
-```
-
-```gherkin
-# language: pt
-Funcionalidade: Evidências públicas da entrega (FR-035, FR-036)
-
-  Cenário: Avaliador acessa as evidências
-    Dado que o link público do dataset de avaliação foi gerado e registrado no README
-    E o avaliador não tem acesso ao workspace do desenvolvedor
-    Quando o avaliador abre o link
-    Então o dataset de avaliação com 15 exemplos é exibido
-    E as execuções do prompt v2 com notas maiores ou iguais a 0.8 são visíveis
-    E o tracing de ao menos 3 exemplos pode ser inspecionado
-```
-
-## 12. Requisitos não funcionais
-
-| ID | Categoria | Requisito | Critério de avaliação | Origem |
+| ID | Requirement | Acceptance criteria | Rules | Depends on |
 |---|---|---|---|---|
-| NFR-001 | Reprodutibilidade | A geração e a avaliação são executadas com temperatura 0, e os modelos escolhidos devem aceitar esse valor | Execução da avaliação sem erro de parâmetro de temperatura | Confirmado (`.env.example`; existente no código) |
-| NFR-002 | Configurabilidade | Provedor (Google ou OpenAI), modelo de resposta e modelo de avaliação são configuráveis sem alteração de código | Trocar o provedor ou o modelo exige apenas alterar a configuração de ambiente | Confirmado |
-| NFR-003 | Segurança de credenciais | Credenciais ficam apenas na configuração de ambiente local, não são versionadas e não aparecem no README, nos screenshots ou na saída das rotinas | Inspeção do repositório e das evidências sem ocorrência de chaves | Confirmado (`CLAUDE.md`) |
-| NFR-004 | Segurança de conteúdo de terceiros | A obtenção de prompts de terceiros identificados por `owner/nome` é autorizada explicitamente apenas para o prompt semente do desafio, de origem conhecida | Nenhum outro prompt de terceiros é obtido pelo produto | Confirmado |
-| NFR-005 | Compatibilidade | O produto executa em Python 3.10 ou superior | Execução bem-sucedida em Python 3.10+ | Confirmado no documento de contexto; divergência com o README base (Q-003) |
-| NFR-006 | Operação sob limites de cota | A avaliação opera dentro de limites baixos de requisições por minuto de planos gratuitos, executando os exemplos sequencialmente. Cada exemplo consome 4 chamadas ao LLM (1 de geração e 3 de julgamento); cada avaliação completa, 60 chamadas | Avaliação completa sem erros de limite de requisições. Os limites vigentes do provedor não estão definidos (Q-004) | Existente (código); valores de cota pendentes |
-| NFR-007 | Observabilidade | Cada execução da avaliação é rastreável no LangSmith, com trace por exemplo e as cinco notas registradas como feedback | Experimento exibe 15 execuções com traces e feedback | Confirmado / existente |
-| NFR-008 | Testabilidade | A validação estrutural executa sem acesso a rede e sem consumo de LLM | Testes executam com a rede desabilitada | Confirmado (`CLAUDE.md`) |
-| NFR-009 | Manutenibilidade | O código é legível, limpo e simples, segundo o Zen do Python | Revisão de código | Confirmado (`CLAUDE.md`) |
-| NFR-010 | Usabilidade e idioma | Mensagens ao usuário e erros exibidos em português; identificadores, comentários e logs em inglês | Inspeção das mensagens e do código | Confirmado (`CLAUDE.md`) |
-| NFR-011 | Reprodutibilidade da entrega | As rotinas são executadas a partir da raiz do repositório, com os comandos documentados no README | Um terceiro reproduz o fluxo seguindo apenas o README | Confirmado |
+| FR-001 | Before contacting the Hub, the system checks that the LangSmith credentials are configured | With a missing variable, the system lists the missing variables in Portuguese, does not contact the Hub and exits with failure status | BR-014 | — |
+| FR-002 | The system pulls `leonanluppi/bug_to_user_story_v1` from the Hub | With valid credentials, the system gets the system and user messages of the seed prompt | BR-013, BR-015 | FR-001 |
+| FR-003 | The system saves the pulled prompt to `prompts/bug_to_user_story_v1.yml`, with system prompt, user prompt and available metadata | The file exists, is valid YAML and its system and user texts equal those of the pulled prompt | R-03 | FR-002 |
+| FR-004 | On pull failure, the system reports the reason in Portuguese and exits with failure status | Network error, invalid credential or missing prompt produce a descriptive message and failure status | — | FR-002 |
 
-Tempo de execução máximo das rotinas: não há fundamento nas fontes para definir meta. Não foi especificado.
+### 9.2. G2: Optimized v2 prompt
 
-## 13. Regras de negócio
+Detailed in [spec 002](../../specs/002-prompt-v2/spec.md).
 
-| ID | Nome | Descrição | Condição | Resultado | Requisitos |
-|---|---|---|---|---|---|
-| BR-001 | Critério de aprovação | A aprovação exige cada uma das cinco métricas maior ou igual a 0.8 e a média das cinco maior ou igual a 0.8 | Ao final de cada avaliação | APROVADO somente se ambas as condições forem atendidas; caso contrário, REPROVADO | FR-023 |
-| BR-002 | Métricas derivadas | Helpfulness = (Clarity + Precision) / 2; Correctness = (F1-Score + Precision) / 2, calculadas por exemplo | A cada exemplo avaliado | Precision influencia as duas métricas derivadas | FR-022 |
-| BR-003 | Imutabilidade dos instrumentos de avaliação | Dataset, métricas, limite de aprovação, script de avaliação e funções auxiliares não podem ser alterados | Sempre | Melhorias de nota só podem vir do prompt | FR-021 a FR-024 |
-| BR-004 | Objeto da otimização | Somente o prompt v2 pode ser alterado para melhorar as notas | Durante as iterações | Alterações em outros artefatos não contam como otimização | FR-005 a FR-014 |
-| BR-005 | Identificação do prompt publicado | O identificador é `{handle}/bug_to_user_story_v2`. O handle é criado ao tornar um prompt público pela primeira vez na interface do LangSmith e é definitivo após confirmado | Antes da primeira publicação | Sem handle, a publicação não é possível | FR-017, FR-020 |
-| BR-006 | Visibilidade pública | O prompt v2 publicado deve ser público | Na publicação | Prompt acessível a terceiros | FR-018 |
-| BR-007 | Fonte da avaliação | A avaliação usa a versão publicada no Hub, não o arquivo local | A cada avaliação | Alterações locais só são avaliadas após nova publicação | FR-021 |
-| BR-008 | Técnicas obrigatórias | Few-shot é obrigatório, mais ao menos uma técnica entre CoT, Tree of Thought, Skeleton of Thought, ReAct e Role Prompting. Os metadados devem listar ao menos 2 técnicas | Na criação e na validação do v2 | Prompt fora da regra é rejeitado pela validação | FR-008, FR-009, FR-016, FR-031 |
-| BR-009 | Variável de entrada | A única entrada do prompt é o relato de bug, recebido no prompt de usuário | Na definição do v2 | O relato não aparece duplicado no prompt de sistema | FR-011 |
-| BR-010 | Escolha de modelos | Os modelos não são fixados pelo desafio; devem ser escolhidos pela documentação oficial vigente do provedor. O modelo de avaliação pode ser o mesmo ou um mais capaz | Na configuração | Escolha registrada na configuração de ambiente | NFR-002 |
-| BR-011 | Link público de evidências | O link público é obtido compartilhando o dataset de avaliação, o que expõe os experimentos. Um novo compartilhamento muda o link | Ao gerar evidências | O link deve ser gerado uma vez e registrado | FR-033, FR-035 |
-| BR-012 | Dataset de avaliação | O dataset de avaliação no LangSmith é nomeado `{LANGSMITH_PROJECT}-eval` e é criado a partir dos 15 exemplos locais, ou reutilizado se já existir | Na avaliação | O nome do projeto de tracing não pode ficar vazio | FR-021 |
-| BR-013 | Prompt semente | O prompt de origem é `leonanluppi/bug_to_user_story_v1` | Na obtenção | Nenhum outro prompt de origem é usado | FR-002 |
-| BR-014 | Pré-condição de configuração | Rotinas que acessam serviços externos exigem credenciais configuradas | Antes de acessar serviços externos | Execução interrompida com lista de variáveis faltantes | FR-001 |
-| BR-015 | Autorização explícita para prompt de terceiros | A obtenção de prompt identificado por `owner/nome` exige autorização explícita, por se tratar de objeto serializado de terceiros | Na obtenção do prompt semente | Obtenção autorizada apenas para o prompt semente | FR-002, NFR-004 |
-| BR-016 | Formato da User Story | A saída esperada segue o padrão das referências do dataset: frase "Como um ..., eu quero ..., para que ..." seguida de "Critérios de Aceitação" no formato Dado / Quando / Então / E. Relatos médios e complexos incluem seções adicionais de contexto técnico e tarefas | Na definição do formato de saída do v2 | Saída comparável às referências pelo LLM juiz | FR-012 |
-| BR-017 | Forma de entrega | A entrega é um repositório público no GitHub que seja fork do repositório base | Na entrega | Repositório fora dessa forma não atende ao entregável | FR-037 |
+| ID | Requirement | Acceptance criteria | Rules | Depends on |
+|---|---|---|---|---|
+| FR-005 | The optimized prompt lives in `prompts/bug_to_user_story_v2.yml` with metadata | The file has description, system prompt, user prompt, version, creation date, tags and the list of applied techniques | BR-008 | — |
+| FR-006 | The system prompt defines the persona explicitly | The system prompt contains a persona sentence starting with "Você é" (Role Prompting) | BR-008 | FR-005 |
+| FR-007 | The system prompt describes the task specifically and lists explicit behavior rules (do and do not) | The system prompt contains an identifiable rules section | — | FR-005 |
+| FR-008 | The system prompt contains Few-shot examples | Exactly 3 own examples (simple, medium, complex), each marked `Exemplo N`, `Entrada:` and `Saída:`; none copied from the dataset | BR-008, BR-020 | FR-005 |
+| FR-009 | The prompt applies Role Prompting and Chain of Thought in addition to Few-shot | `techniques_applied` lists few-shot, role prompting and chain of thought; the CoT analysis steps are identifiable in the text and the reasoning is not shown in the answer | BR-008 | FR-005 |
+| FR-010 | The prompt instructs behavior for edge cases | Explicit instructions for: (a) vague or incomplete report, with no invented data; (b) several problems in one report, using the complex format | — | FR-005 |
+| FR-011 | Persona, instructions, rules and examples are in the system prompt; the bug report is received only in the user prompt | `{bug_report}` appears only in the user prompt | BR-009 | FR-005 |
+| FR-012 | The prompt requires the User Story output format of the dataset references, varying by report complexity | The system prompt names the required format explicitly ("User Story") and describes it per complexity level | BR-016 | FR-005 |
+| FR-013 | The prompt has no pending-edit markers | No `[TODO]` anywhere and no uppercase `TODO` in the system prompt | — | FR-005 |
+| FR-014 | The prompt text sent to the LLM is in Portuguese | Instructions, rules and examples are in Portuguese | — | FR-005 |
 
-BR-016 descreve o formato observado nas respostas de referência do dataset (fato). Que o v2 deva reproduzi-lo integralmente é uma premissa (PR-03): é o meio esperado de maximizar F1-Score e Precision, mas não está escrito como regra no material do desafio.
+### 9.3. G3: Versioned publishing
 
-## 14. Fluxos principais de utilização
+Detailed in [spec 003](../../specs/003-push-prompt/spec.md).
 
-**FL-01: Preparação do ambiente**
-- Objetivo: deixar o ambiente apto a executar as rotinas.
-- Condições iniciais: repositório fork clonado; conta no LangSmith; chave do provedor de LLM.
-- Etapas:
-  1. Criar o handle público no LangSmith, tornando um prompt público na interface.
-  2. Configurar o ambiente a partir do modelo de variáveis (credenciais, projeto, handle, provedor, modelos).
-  3. Criar o ambiente virtual e instalar as dependências.
-- Resultado: rotinas executáveis.
-- Exceções: modelo que não aceita temperatura 0 (NFR-001).
-- Requisitos: BR-005, BR-010, NFR-001, NFR-002, NFR-005.
+| ID | Requirement | Acceptance criteria | Rules | Depends on |
+|---|---|---|---|---|
+| FR-015 | The system reads the prompt from `prompts/bug_to_user_story_v2.yml` | Missing file or invalid YAML: error in Portuguese, failure status, nothing published | — | FR-005 |
+| FR-016 | The system validates the prompt structure before publishing | A prompt without description, without or with empty system prompt, without version, with pending markers or with fewer than 2 techniques is not published; all errors are listed | BR-008 | FR-015 |
+| FR-017 | The system publishes the prompt as `{handle}/bug_to_user_story_v2` | After publishing, the prompt is found on the Hub by that identifier | BR-005 | FR-016 |
+| FR-018 | The published prompt is public | The prompt opens for a user without workspace access | BR-006 | FR-017 |
+| FR-019 | Publishing records tags, description and applied techniques | Tags, description and techniques are visible on the Hub (techniques in tags and description, pending confirmation of available fields: Q-014) | — | FR-017 |
+| FR-020 | The system reports success or failure; on a missing handle, it explains how to create one via Make Public in the LangSmith UI. Should Have: print the published prompt URL | Exit status reflects the result; messages in Portuguese | BR-005 | FR-017 |
 
-**FL-02: Obtenção do prompt base**
-- Objetivo: ter o v1 localmente.
-- Condições iniciais: FL-01 concluído.
-- Etapas: executar a obtenção e analisar o arquivo gerado.
-- Resultado: `prompts/bug_to_user_story_v1.yml` criado.
-- Exceções: credenciais ausentes ou falha no Hub.
-- Requisitos: FR-001 a FR-004.
+### 9.4. G4: Quality evaluation (Existing)
 
-**FL-03: Otimização e validação local**
-- Objetivo: produzir um v2 estruturalmente válido.
-- Condições iniciais: FL-02 concluído.
-- Etapas:
-  1. Editar o v2.
-  2. Executar a validação estrutural.
-  3. Corrigir as falhas.
-- Resultado: 6 verificações aprovadas.
-- Exceções: verificações reprovadas retornam à etapa de edição.
-- Requisitos: FR-005 a FR-014, FR-025 a FR-031.
+FR-021 to FR-024 describe behavior already implemented in `src/evaluate.py`. They must not be implemented or changed (BR-003); they exist for verification and traceability.
 
-**FL-04: Publicação**
-- Objetivo: disponibilizar o v2 no Hub.
-- Condições iniciais: FL-03 concluído; handle existente.
-- Etapas: executar a publicação e verificar o prompt no Hub.
-- Resultado: prompt público com metadados.
-- Exceções: validação reprovada; handle inexistente.
-- Requisitos: FR-015 a FR-020.
-
-**FL-05: Avaliação e iteração**
-- Objetivo: atingir BR-001.
-- Condições iniciais: FL-04 concluído.
-- Etapas:
-  1. Executar a avaliação.
-  2. Se REPROVADO, analisar as métricas baixas e os traces por exemplo.
-  3. Retornar a FL-03 e FL-04.
-  4. Repetir até APROVADO.
-- Resultado: experimento aprovado.
-- Exceções:
-  - limite de requisições do provedor;
-  - falha de chamada ao LLM juiz, que resulta em nota 0.0 no exemplo e reduz a média (RK-02).
-- Requisitos: FR-021 a FR-024, BR-001, BR-007.
-
-**FL-06: Geração de evidências e entrega**
-- Objetivo: permitir a verificação por P2.
-- Condições iniciais: FL-05 aprovado.
-- Etapas:
-  1. Gerar uma única vez o link público do dataset.
-  2. Capturar os screenshots.
-  3. Escrever as seções do README.
-  4. Publicar o repositório.
-- Resultado: entrega verificável.
-- Exceções: novo compartilhamento muda o link (BR-011).
-- Dependência pendente: local dos screenshots (Q-007).
-- Requisitos: FR-032 a FR-037.
-
-## 15. Dependências, restrições e premissas
-
-### 15.1. Dependências
-
-| ID | Dependência |
-|---|---|
-| D-01 | Conta no LangSmith com chave de API e acesso ao Prompt Hub, a datasets e a experimentos |
-| D-02 | Handle público do LangSmith Hub |
-| D-03 | Disponibilidade pública do prompt semente `leonanluppi/bug_to_user_story_v1` |
-| D-04 | Chave de API do provedor de LLM (Google Gemini ou OpenAI) e modelos disponíveis |
-| D-05 | Repositório base `devfullcycle/mba-ia-pull-evaluation-prompt` com os componentes prontos |
-| D-06 | Acesso à internet para obtenção, publicação e avaliação |
-
-### 15.2. Restrições
-
-| ID | Restrição |
-|---|---|
-| R-01 | Linguagem Python 3.10+ |
-| R-02 | Framework LangChain; plataforma de avaliação e gestão de prompts LangSmith |
-| R-03 | Formato de prompts em YAML |
-| R-04 | Estrutura obrigatória de diretórios e arquivos do desafio |
-| R-05 | Componentes prontos e dataset não podem ser alterados (BR-003) |
-| R-06 | Entrega como fork público (BR-017) |
-| R-07 | Regras de idioma do `CLAUDE.md` |
-| R-08 | Processo de versionamento: commits só com autorização explícita, Conventional Commits em português e uma branch por fase |
-
-### 15.3. Premissas
-
-| ID | Premissa |
-|---|---|
-| PR-01 | O prompt semente permanecerá disponível no Hub durante o desenvolvimento |
-| PR-02 | A cota do provedor escolhido é suficiente para as iterações necessárias (3 a 5 esperadas, cerca de 60 chamadas por avaliação) |
-| PR-03 | Reproduzir no v2 o formato das referências do dataset (BR-016) contribui para atingir as metas de F1-Score e Precision |
-| PR-04 | Uma única execução de avaliação com status APROVADO é suficiente para a entrega (ver Q-010) |
-
-### 15.4. Riscos e mitigações
-
-| ID | Risco | Mitigação |
-|---|---|---|
-| RK-01 | Limite de requisições ou cota do plano gratuito interrompe a avaliação | Avaliação sequencial (existente); escolher modelo e plano com cota compatível; espaçar as execuções |
-| RK-02 | Falha de chamada ou de interpretação do LLM juiz gera nota 0.0 no exemplo e derruba a média | Inspecionar o feedback e os traces por exemplo antes de alterar o prompt; repetir a avaliação quando a falha for de infraestrutura |
-| RK-03 | Variação das notas entre execuções por julgamento de LLM | Temperatura 0 (NFR-001); registrar as notas de cada iteração; ver Q-010 |
-| RK-04 | Modelo escolhido descontinuado ou sem suporte a temperatura 0 | Escolher pela documentação oficial vigente (BR-010) |
-| RK-05 | Ajuste excessivo do prompt ao dataset (exemplos copiados das referências) | Usar exemplos Few-shot próprios, não retirados do dataset |
-| RK-06 | Escolha definitiva de um handle inadequado | Escolher o handle com cuidado antes de confirmar (BR-005) |
-| RK-07 | Repositório atual do desenvolvedor fora do formato de entrega (não é fork e está vazio) | Criar fork do repositório base (Q-001) |
-| RK-08 | Link público alterado por novo compartilhamento após registro no README | Gerar uma única vez e registrar (BR-011) |
-
-## 16. Fora do escopo
-
-| Item | Motivo | Relação com versões futuras |
-|---|---|---|
-| Alteração do dataset, das métricas, do limite ou do script de avaliação | Proibido pelo desafio (BR-003) | Nenhuma prevista |
-| Avaliação automatizada do v1 ou de outros prompts | O script existente avalia somente o v2 e não pode ser alterado | Pendente de decisão (Q-005) |
-| Métricas adicionais existentes no módulo de métricas e não utilizadas pela avaliação (Tone, Acceptance Criteria, User Story Format, Completeness) | Não fazem parte do critério de aprovação | Não prevista nas fontes |
-| Fixação de provedor ou modelo no código | Proibido (BR-010, NFR-002) | Nenhuma |
-| Banco de dados | Não utilizado no projeto | Nenhuma |
-| Uso operacional das User Stories geradas por times de produto | O produto mede a qualidade do prompt; não é ferramenta de produção | Não prevista |
-
-## 17. Questões em aberto e decisões pendentes
-
-| ID | Questão | Motivo | Impacto | Afeta | Próxima ação |
-|---|---|---|---|---|---|
-| Q-001 | O repositório `fonsecamrs/mba-prompt-evaluator-challenge-2` está vazio e não é fork do repositório base. Qual repositório será usado na entrega? | Contradição entre o repositório criado e o entregável exigido | Entrega não conforme se mantido | FR-037, BR-017 | Criar fork do repositório base e decidir o nome |
-| Q-002 | O `CLAUDE.md` define documentação em `docs/` em inglês; este PRD foi solicitado em português do Brasil | Contradição entre fontes | Inconsistência de idioma na documentação | Este PRD, NFR-010, R-07 | Decidir se o PRD é exceção ou se o `CLAUDE.md` deve ser atualizado |
-| Q-003 | Versão mínima do Python: 3.10+ (documento de contexto) ou 3.9+ (README do repositório base) | Contradição entre fontes | Compatibilidade do ambiente | NFR-005, R-01 | Confirmar 3.10+, adotado provisoriamente |
-| Q-004 | Provedor de LLM, modelo de resposta, modelo de avaliação e limites de cota vigentes | Não definidos; o desafio exige consulta à documentação oficial | Custo, cota, duração e notas obtidas | NFR-001, NFR-006, BR-010 | Consultar a documentação do provedor e registrar a decisão em ADR |
-| Q-005 | A comparação v1 x v2 no README exige notas medidas do v1? | O material pede "o que mudou e por quê"; as notas do v1 no material são ilustrativas, e o script de avaliação não avalia o v1 | Conteúdo da seção Resultados Finais | FR-033 | Confirmar com o critério de correção do desafio |
-| Q-006 | O formato exigido é "User Story padrão" ou "Markdown"? O teste aceita qualquer um; as referências do dataset usam texto com seções, sem cabeçalhos Markdown | Ambiguidade | Notas de F1-Score e Precision; critério de FR-028 | FR-012, FR-028, BR-016 | Definir na spec do prompt e validar com a primeira avaliação |
-| Q-007 | Local de armazenamento dos screenshots no repositório | Não definido | Organização da entrega | FR-033, FL-06 | Decidir antes de FL-06 |
-| Q-008 | Padrão de nome das branches por fase | Não definido no `CLAUDE.md` | Processo de versionamento | R-08 | Definir com o desenvolvedor |
-| Q-009 | Prazo de entrega do desafio | Ausente nas fontes | Planejamento das iterações | KPI-08 | Consultar o calendário do MBA |
-| Q-010 | A aprovação precisa ser estável em execuções repetidas, ou basta uma execução aprovada? | Notas de LLM juiz podem variar entre execuções | Critério de conclusão do MVP | BR-001, PR-04, RK-03 | Confirmar com o critério de correção |
-| Q-011 | Responsável pelo produto e aprovação formal deste PRD | Ausente nas fontes | Governança do documento | Seção 1, seção 18 | Indicar o responsável e o aprovador |
-| Q-012 | Quantidade mínima de exemplos Few-shot | O material recomenda 2 a 3 exemplos, mas não exige quantidade | Critério de FR-008 e FR-029 | FR-008, FR-029 | Definir na spec do prompt |
-| Q-013 | Lista mínima de casos de borda que o prompt deve tratar | O requisito existe, mas os casos não são enumerados nas fontes | Verificabilidade de FR-010 | FR-010 | Definir na spec do prompt |
-| Q-014 | Forma de exibir as técnicas utilizadas nos metadados do Hub (tags, descrição ou outro campo) | O requisito existe, mas o meio não é definido | Verificabilidade de FR-019 | FR-019 | Definir na spec de publicação |
-
-## 18. Evolução do produto e versionamento do PRD
-
-Diretrizes:
-- Atualizar este documento quando houver mudança relevante em requisitos, escopo, objetivos ou critérios de sucesso.
-- Registrar toda alteração significativa no histórico abaixo, com justificativa.
-- Ao alterar um requisito, atualizar na mesma revisão as histórias, regras, critérios de aceitação e a matriz de rastreabilidade relacionados.
-- Não reutilizar identificadores removidos; marcar requisitos descontinuados como "Removido" em vez de apagá-los.
-- Revisar as métricas de sucesso apenas com justificativa registrada.
-- Registrar como nova versão qualquer decisão que altere o MVP.
-- Ao resolver uma questão da seção 17, registrar a decisão e atualizar os requisitos afetados.
-
-### 18.1. Histórico de versões
-
-| Data | Versão | Alteração | Justificativa |
+| ID | Requirement | Acceptance criteria | Rules |
 |---|---|---|---|
-| 2026-10-13 | 0.1 | Criação do documento | Consolidação inicial dos requisitos do desafio, do `CLAUDE.md` e do repositório base. Sem aprovação formal |
+| FR-021 | The system pulls `{handle}/bug_to_user_story_v2` from the Hub and runs it against the 15 dataset examples as a new experiment | Each run creates an experiment with 15 prompt runs | BR-007, BR-012 |
+| FR-022 | For each example, the system computes F1-Score, Clarity and Precision with the LLM judge, derives Helpfulness and Correctness and records the five scores as feedback | Each example has five scores between 0.0 and 1.0 | BR-002 |
+| FR-023 | The system shows the five averages and the overall average and prints APROVADO or REPROVADO, listing metrics below the threshold | Status follows BR-001 | BR-001 |
+| FR-024 | The system prints the experiment URL | URL printed when the experiment is created | — |
 
-## 19. Matriz de rastreabilidade
+### 9.5. G5: Automated structural validation
 
-### 19.1. Objetivos, problemas e indicadores
+Detailed in [spec 004](../../specs/004-validation-tests/spec.md).
 
-| Objetivo | Problemas | Indicadores | Grupos |
+| ID | Requirement | Acceptance criteria | Depends on |
 |---|---|---|---|
-| OBJ-01 | PB-01, PB-02 | KPI-01 a KPI-06, KPI-08 | G2, G3, G4 |
+| FR-025 | Structural checks run with a single test command | The command runs FR-026 to FR-031 and reports each result | FR-005 |
+| FR-026 | `test_prompt_has_system_prompt`: system prompt exists and is not empty | Fails if missing or whitespace only | FR-025 |
+| FR-027 | `test_prompt_has_role_definition`: the prompt defines a persona | Fails without a "Você é" persona sentence in the system prompt | FR-006 |
+| FR-028 | `test_prompt_mentions_format`: the prompt requires User Story or Markdown format | Fails if the required format is not mentioned | FR-012 |
+| FR-029 | `test_prompt_has_few_shot_examples`: the prompt has input/output examples | Fails with fewer than 3 examples marked `Exemplo`, `Entrada:`, `Saída:` | FR-008 |
+| FR-030 | `test_prompt_no_todos`: no `[TODO]` | Fails if `[TODO]` appears in the system or user prompt | FR-013 |
+| FR-031 | `test_minimum_techniques`: at least 2 techniques in the YAML metadata | Fails if `techniques_applied` has fewer than 2 items | BR-008 |
+| FR-039 | Should Have. Additional test: `{bug_report}` is in the user prompt and not in the system prompt | Fails if the variable is missing from the user prompt or present in the system prompt | FR-011 |
+
+### 9.6. G6: Delivery documentation and evidence
+
+| ID | Requirement | Acceptance criteria | Rules | Depends on |
+|---|---|---|---|---|
+| FR-032 | The README has the section "Técnicas Aplicadas (Fase 2)" | Lists the techniques, the rationale and a practical example of each in v2 | — | FR-009 |
+| FR-033 | The README has the section "Resultados Finais" | Contains the public dataset link, screenshots (stored in `docs/images/`) with scores >= 0.8, a qualitative v1 x v2 comparison (what changed and why) and the history of valid iterations with their scores | BR-011 | FR-023, FR-035 |
+| FR-034 | The README has the section "Como Executar" | Contains prerequisites, dependencies and the commands of each phase | — | — |
+| FR-035 | A public URL of the evaluation dataset, exposing the experiments run against it, is created once and recorded | The URL opens for a user without workspace access | BR-011 | FR-021 |
+| FR-036 | Through the public link or screenshots, the following are visible: the 15-example dataset, the v2 runs with scores >= 0.8 and the detailed tracing of at least 3 examples | All three items are verifiable by P2 | — | FR-035 |
+| FR-037 | The delivery is a public GitHub repository forked from the base repository | `fonsecamrs/mba-ia-pull-evaluation-prompt` is public, a fork of `devfullcycle/mba-ia-pull-evaluation-prompt`, and contains the implemented code, the complete v2 and the updated README | BR-017 | G1 to G5 |
+| FR-038 | The delivery README replaces the challenge statement | The README contains the delivery documentation and links to the original statement in the base repository | — | FR-032 to FR-034 |
+
+## 10. User stories
+
+| ID | Story | Requirements | Acceptance criteria |
+|---|---|---|---|
+| US-001 | As the challenge developer, I want to pull the v1 prompt from the Hub, to analyze its defects and use it as the starting point | FR-001 to FR-004 | The v1 file is created with the Hub content; failures exit with failure status |
+| US-002 | As the challenge developer, I want a versioned v2 prompt with persona, rules, examples, additional technique and edge cases, to generate better User Stories than v1 | FR-005 to FR-014 | The file meets FR-005 to FR-014 and passes FR-026 to FR-031 |
+| US-003 | As the challenge developer, I want to validate the v2 structure automatically, to be sure it meets the minimum requirements before publishing | FR-025 to FR-031, FR-039 | A single command runs the checks and reports each result |
+| US-004 | As the challenge developer, I want to publish v2 to the Hub as public with metadata, so it can be evaluated and consulted | FR-015 to FR-020 | Invalid prompt is not published; valid prompt is public as `{handle}/bug_to_user_story_v2` with metadata |
+| US-005 | As the challenge developer, I want to evaluate the published v2 with five objective metrics, to know whether it meets the approval criterion | FR-021 to FR-024 | The run shows the five scores, the average and the status per BR-001 |
+| US-006 | As the challenge developer, I want to edit, republish and re-evaluate v2 and compare experiments, to reach >= 0.8 on all metrics | FR-005 to FR-024 | Each valid cycle creates a comparable experiment; the last one meets BR-001 |
+| US-007 | As the reviewer, I want a public link with the dataset, runs and traces, to verify the scores without workspace access | FR-035, FR-036 | The link opens without workspace authentication and shows the FR-036 items |
+| US-008 | As the reviewer, I want to read in the README the techniques, results and run instructions, to assess and reproduce the solution | FR-032 to FR-034, FR-037, FR-038 | The README has the three mandatory sections and the repository meets FR-037 |
+
+## 11. Acceptance criteria in Gherkin
+
+```gherkin
+Feature: Base prompt pull (FR-001 to FR-004)
+
+  Scenario: Pull the seed prompt with valid credentials
+    Given the LangSmith credentials are configured
+    And the prompt "leonanluppi/bug_to_user_story_v1" is available on the Hub
+    When the developer runs the pull
+    Then "prompts/bug_to_user_story_v1.yml" is created as valid YAML
+    And it contains the system and user texts of the pulled prompt
+    And the run exits with success status
+
+  Scenario: Missing credential
+    Given the LangSmith API key is not configured
+    When the developer runs the pull
+    Then the system lists the missing variables in Portuguese
+    And the Hub is not contacted
+    And the run exits with failure status
+
+  Scenario: Hub failure
+    Given the credentials are configured
+    And the Hub does not respond or rejects the request
+    When the developer runs the pull
+    Then the system reports the reason in Portuguese
+    And the run exits with failure status
+```
+
+```gherkin
+Feature: v2 structural validation (FR-025 to FR-031, FR-039)
+
+  Scenario: Compliant v2 prompt
+    Given the v2 prompt has a non-empty system prompt
+    And defines a persona
+    And requires the User Story format
+    And contains 3 input/output examples
+    And has no "[TODO]"
+    And lists at least 2 techniques in its metadata
+    When the developer runs the structural validation
+    Then all checks pass
+
+  Scenario: Only one technique listed
+    Given the v2 metadata lists a single technique
+    When the developer runs the structural validation
+    Then the minimum techniques check fails
+    And the result names the failing check
+
+  Scenario: Forgotten pending marker
+    Given the v2 prompt contains "[TODO]"
+    When the developer runs the structural validation
+    Then the no-pending-markers check fails
+```
+
+```gherkin
+Feature: v2 publishing (FR-015 to FR-020)
+
+  Scenario: Publish a valid prompt
+    Given the local v2 prompt is valid
+    And the public Hub handle exists and is configured
+    When the developer runs the push
+    Then the prompt is available on the Hub as "{handle}/bug_to_user_story_v2"
+    And the prompt is public
+    And tags, description and techniques are recorded
+    And the run exits with success status
+
+  Scenario: Block an invalid prompt
+    Given the local v2 prompt has no version field
+    And lists fewer than 2 techniques
+    When the developer runs the push
+    Then nothing is published
+    And all validation errors are listed in Portuguese
+    And the run exits with failure status
+
+  Scenario: Missing Hub handle
+    Given the local v2 prompt is valid
+    And the configured handle does not exist on the Hub
+    When the developer runs the push
+    Then publishing fails
+    And the system explains how to create the handle via Make Public in the LangSmith UI
+
+  Scenario: Missing v2 file
+    Given "prompts/bug_to_user_story_v2.yml" does not exist
+    When the developer runs the push
+    Then the system reports that the file was not found
+    And nothing is published
+```
+
+```gherkin
+Feature: Evaluation of the published prompt (FR-021 to FR-024, BR-001, BR-018)
+
+  Scenario: Approval with every metric at or above the threshold
+    Given the v2 prompt is published
+    And the averages are Helpfulness 0.85, Correctness 0.80, F1-Score 0.80, Clarity 0.90 and Precision 0.80
+    When the developer runs the evaluation
+    Then the status shown is "APROVADO"
+
+  Scenario: Rejection with a high average and one metric below the threshold
+    Given the v2 prompt is published
+    And the averages are Helpfulness 0.95, Correctness 0.87, F1-Score 0.79, Clarity 0.95 and Precision 0.95
+    When the developer runs the evaluation
+    Then the status shown is "REPROVADO"
+    And "f1_score" is listed as below 0.8
+
+  Scenario: Unpublished local change
+    Given the developer changed the local v2 prompt
+    And did not run the push afterwards
+    When the developer runs the evaluation
+    Then the evaluated version is the last one published on the Hub
+
+  Scenario: v2 not yet published
+    Given "{handle}/bug_to_user_story_v2" does not exist on the Hub
+    When the developer runs the evaluation
+    Then the system reports that the prompt was not found
+    And tells the developer to run the push
+
+  Scenario: Run invalidated by an infrastructure error
+    Given an evaluation run printed "Erro ao avaliar" for at least one example
+    When the developer reviews the run
+    Then the run is discarded and not counted as an iteration
+    And the evaluation is repeated without changing the prompt
+```
+
+```gherkin
+Feature: Public delivery evidence (FR-035, FR-036)
+
+  Scenario: Reviewer opens the evidence
+    Given the public dataset link was created and recorded in the README
+    And the reviewer has no access to the developer workspace
+    When the reviewer opens the link
+    Then the 15-example evaluation dataset is shown
+    And the v2 runs with scores >= 0.8 are visible
+    And the tracing of at least 3 examples can be inspected
+```
+
+## 12. Non-functional requirements
+
+| ID | Category | Requirement | Evaluation criterion | Origin |
+|---|---|---|---|---|
+| NFR-001 | Reproducibility | Generation and evaluation run with temperature 0 (Existing). The Gemini 3.x guide recommends the default 1.0 and warns that lower values may cause looping or degraded quality; this is accepted because the evaluation code cannot change (RK-12) | Evaluation runs without temperature errors; first run traces checked for looping | Existing; [ADR-001](../adr/ADR-001-llm-provider-and-models.md) |
+| NFR-002 | Configurability | Provider, generation model and evaluation model are set only in the environment configuration | Changing provider or model only requires editing `.env` | Confirmed |
+| NFR-003 | Credential security | Credentials live only in the local `.env`, are never versioned and never appear in the README, screenshots or routine output | Repository and evidence contain no keys | Confirmed |
+| NFR-004 | Third-party content safety | Pulling a third-party `owner/name` prompt is explicitly allowed only for the challenge seed prompt | No other third-party prompt is pulled | Confirmed |
+| NFR-005 | Compatibility | The product runs on Python 3.10 or later | Successful run on Python 3.10+; compatibility of the pinned packages with the local Python 3.14 is checked in Phase 1 | Confirmed (challenge statement) |
+| NFR-006 | Quota operation | The evaluation runs sequentially within the free-tier quotas: 60 LLM calls per run (15 generation, 45 judge). Measured limits on 2026-10-19: 15 RPM and 500 RPD per model, about 11 runs per day with the chosen models | Runs complete without quota errors; otherwise BR-018 applies | Existing; [ADR-001](../adr/ADR-001-llm-provider-and-models.md) |
+| NFR-007 | Observability | Each evaluation run is traceable in LangSmith, with a trace per example and the five scores as feedback | The experiment shows 15 runs with traces and feedback | Existing |
+| NFR-008 | Testability | Structural validation runs without network access and without LLM usage | Tests pass with the network disabled | Confirmed |
+| NFR-009 | Maintainability | Code is readable, clean and simple, following the Zen of Python | Code review | Confirmed |
+| NFR-010 | Usability and language | User messages and errors in Portuguese; identifiers, comments and logs in English | Inspection | Confirmed |
+| NFR-011 | Delivery reproducibility | Routines run from the repository root with the commands documented in the README | A third party reproduces the flow following only the README | Confirmed |
+
+No maximum run time is defined: the sources give no basis for one.
+
+## 13. Business rules
+
+| ID | Name | Description | Requirements |
+|---|---|---|---|
+| BR-001 | Approval criterion | Approval requires each of the five metrics >= 0.8 and their average >= 0.8; otherwise REPROVADO | FR-023 |
+| BR-002 | Derived metrics | Per example: Helpfulness = (Clarity + Precision) / 2; Correctness = (F1-Score + Precision) / 2. Precision affects both | FR-022 |
+| BR-003 | Immutable evaluation instruments | Dataset, metrics, threshold, evaluation script and helpers cannot be changed | FR-021 to FR-024 |
+| BR-004 | Optimization target | Only the v2 prompt may change to improve scores | FR-005 to FR-014 |
+| BR-005 | Published prompt identifier | `{handle}/bug_to_user_story_v2`. The handle is created the first time a prompt is made public in the LangSmith UI and is permanent once confirmed | FR-017, FR-020 |
+| BR-006 | Public visibility | The published v2 prompt must be public | FR-018 |
+| BR-007 | Evaluation source | The evaluation uses the version published on the Hub, not the local file | FR-021 |
+| BR-008 | Techniques | Few-shot is mandatory, plus at least one of CoT, Tree of Thought, Skeleton of Thought, ReAct, Role Prompting; metadata lists at least 2 techniques. Decided set: Few-shot, Role Prompting, Chain of Thought | FR-008, FR-009, FR-016, FR-031 |
+| BR-009 | Input variable | The only input is the bug report, received in the user prompt as `{bug_report}` | FR-011 |
+| BR-010 | Model choice | Models are not fixed by the challenge; they are chosen from the provider's current official documentation and recorded in [ADR-001](../adr/ADR-001-llm-provider-and-models.md) | NFR-002 |
+| BR-011 | Public evidence link | The public link comes from sharing the evaluation dataset, which exposes its experiments. Sharing again changes the link, so it is created once, with the owner's confirmation, and recorded | FR-033, FR-035 |
+| BR-012 | Evaluation dataset | Named `{LANGSMITH_PROJECT}-eval`, created from the 15 local examples or reused if it exists; the project name cannot be empty | FR-021 |
+| BR-013 | Seed prompt | The source prompt is `leonanluppi/bug_to_user_story_v1` | FR-002 |
+| BR-014 | Configuration precondition | Routines that access external services require credentials and stop listing the missing variables | FR-001 |
+| BR-015 | Explicit consent for third-party prompts | Pulling an `owner/name` prompt requires explicit consent (`dangerously_pull_public_prompt=True`), granted only for the seed prompt | FR-002, NFR-004 |
+| BR-016 | User Story format | The output follows the dataset references: "Como um ..., eu quero ..., para que ..." sentence, "Critérios de Aceitação:" in Dado que / Quando / Então / E; medium reports add technical blocks; complex reports use `=== ... ===` sections (spec 002) | FR-012 |
+| BR-017 | Delivery form | Public GitHub repository forked from the base repository | FR-037 |
+| BR-018 | Invalid runs | A run with a score caused by an infrastructure error (quota, network, unparseable judge output, shown as "Erro ao avaliar") is discarded, repeated without prompt changes and not counted as an iteration; the reason is recorded | KPI-08, FR-023 |
+| BR-019 | Fixed models | Generation and evaluation models stay fixed from the first evaluation on. A change is allowed only by recording a new baseline, because scores across different models are not comparable | NFR-002, KPI-08 |
+| BR-020 | Own examples | Few-shot examples are written for the prompt; reports and references from the dataset are never copied into the prompt | FR-008 |
+
+## 14. Main flows
+
+**FL-01: Environment setup**
+- Steps:
+  1. Create the LangSmith account and API key.
+  2. Create the public Hub handle by making a prompt public in the UI.
+  3. Create the Gemini API key.
+  4. Fill `.env` from `.env.example` (credentials, project, handle, provider, models per ADR-001).
+  5. Create the virtual environment and install the dependencies.
+- Result: routines runnable.
+- Exceptions: package incompatible with the local Python version (NFR-005).
+
+**FL-02: Base prompt pull**: run the pull and analyze the generated file. Exceptions: missing credentials, Hub failure. Requirements: FR-001 to FR-004.
+
+**FL-03: Optimization and local validation**: edit v2, run the structural validation, fix failures. Requirements: FR-005 to FR-014, FR-025 to FR-031, FR-039.
+
+**FL-04: Publishing**: run the push and check the prompt on the Hub. Exceptions: failed validation, missing handle. Requirements: FR-015 to FR-020.
+
+**FL-05: Evaluation and iteration**
+- Steps:
+  1. Run the evaluation.
+  2. Check the output for "Erro ao avaliar"; if present, apply BR-018.
+  3. If REPROVADO, analyze the low metrics and the per-example traces.
+  4. Return to FL-03 and FL-04, preferably one change per iteration.
+  5. Repeat until APROVADO.
+- Requirements: FR-021 to FR-024, BR-001, BR-007, BR-018, BR-019.
+
+**FL-06: Evidence and delivery**
+- Steps:
+  1. Create the public dataset link once (BR-011).
+  2. Capture screenshots into `docs/images/`.
+  3. Replace the README with the delivery documentation.
+  4. Push the repository.
+- Requirements: FR-032 to FR-038.
+
+## 15. Dependencies, constraints, assumptions and risks
+
+### 15.1. Dependencies
+
+| ID | Dependency |
+|---|---|
+| D-01 | LangSmith account with API key and access to the Prompt Hub, datasets and experiments |
+| D-02 | Public LangSmith Hub handle |
+| D-03 | Public availability of the seed prompt `leonanluppi/bug_to_user_story_v1` |
+| D-04 | Google Gemini API key on the free tier, with the models of ADR-001 available |
+| D-05 | Fork `fonsecamrs/mba-ia-pull-evaluation-prompt` with the ready-made components |
+| D-06 | Internet access for pull, push and evaluation |
+
+### 15.2. Constraints
+
+| ID | Constraint |
+|---|---|
+| R-01 | Python 3.10+ |
+| R-02 | LangChain framework; LangSmith for prompt management and evaluation |
+| R-03 | Prompts in YAML |
+| R-04 | Mandatory directory and file structure of the challenge |
+| R-05 | Ready-made components and dataset cannot change (BR-003) |
+| R-06 | Delivery as a public fork (BR-017) |
+| R-07 | Language rules of `CLAUDE.md` |
+| R-08 | Versioning process: commits only with explicit authorization, Conventional Commits in Portuguese, one branch per phase named `phase-N-<name>` |
+
+### 15.3. Assumptions
+
+| ID | Assumption |
+|---|---|
+| PR-01 | The seed prompt stays available on the Hub during development |
+| PR-02 | The free-tier quota (about 11 runs per day) is enough for the expected 3 to 5 iterations plus repeated runs |
+| PR-03 | Mirroring the reference format (BR-016) helps reach the F1-Score and Precision targets |
+
+### 15.4. Risks and mitigations
+
+| ID | Risk | Mitigation |
+|---|---|---|
+| RK-01 | Free-tier rate or daily quota interrupts the evaluation | Sequential evaluation (Existing); generation and judge on different models to split the quota (ADR-001); space out runs |
+| RK-02 | A judge call or parsing failure yields 0.0 for the example and lowers the average | Check the output and traces before changing the prompt; BR-018 |
+| RK-03 | Scores vary between runs because of the LLM judge | Temperature 0; fixed models (BR-019); record each iteration's scores |
+| RK-04 | Chosen model discontinued or without temperature 0 support | Re-check the official documentation before Phase 3 (ADR-001) |
+| RK-05 | Over-fitting the prompt to the dataset | Own Few-shot examples (BR-020) |
+| RK-06 | Permanent choice of an unsuitable handle | Choose carefully before confirming; recommendation: same as the GitHub username |
+| RK-08 | Public link changed by a new share after being recorded in the README | Create it once and record it (BR-011) |
+| RK-09 | Free-tier daily limit allows few runs per day | No fixed deadline; plan one change per iteration; paid tier is a future decision |
+| RK-10 | Git conflicts confuse the developer during setup | Closed: fork cloned without conflicts on 2026-10-13 |
+| RK-11 | A quota error becomes 0.0 silently instead of stopping the run | Check for "Erro ao avaliar" before analyzing scores; BR-018 |
+| RK-12 | Temperature 0 on Gemini 3.x models may cause looping or degraded quality, especially on the long complex outputs | Inspect the traces of the 3 complex examples in the first run; record the finding |
+
+RK-07 (delivery repository not a fork) was closed on 2026-10-13: the fork `fonsecamrs/mba-ia-pull-evaluation-prompt` was created.
+
+## 16. Out of scope
+
+| Item | Reason |
+|---|---|
+| Changing the dataset, metrics, threshold or evaluation script | Forbidden (BR-003) |
+| Automated evaluation of v1 or other prompts | The existing script evaluates only v2 and cannot change; the v1 x v2 comparison is qualitative (Q-005) |
+| Extra metrics present in `metrics.py` but unused (Tone, Acceptance Criteria, User Story Format, Completeness) | Not part of the approval criterion |
+| Hard-coding provider or model | Forbidden (BR-010, NFR-002) |
+| Database | Not used |
+| Authentication, authorization, APIs, deploy | No users, services or servers in the product |
+| Operational use of the generated User Stories | The product measures prompt quality only |
+
+## 17. Decisions and open questions
+
+### 17.1. Decisions recorded during discovery
+
+| ID | Question | Decision | Date |
+|---|---|---|---|
+| Q-001 | Delivery repository | Public fork `fonsecamrs/mba-ia-pull-evaluation-prompt`, original name kept | 2026-10-13 |
+| Q-002 | Documentation language | `docs/` in English, including this PRD | 2026-10-13 |
+| Q-003 | Minimum Python version | 3.10+ (challenge statement); local environment has 3.14 | 2026-10-13 |
+| Q-004 | Provider, models, quotas | Gemini free tier: generation `gemini-3.1-flash-lite`, judge `gemini-3.5-flash-lite` ([ADR-001](../adr/ADR-001-llm-provider-and-models.md)) | 2026-10-19 |
+| Q-005 | v1 x v2 comparison | Qualitative comparison plus the history of v2 iterations; no measured v1 baseline | 2026-10-19 |
+| Q-006 | Output format | Mirror the dataset references, by complexity (BR-016) | 2026-10-19 |
+| Q-007 | Screenshot location | `docs/images/` (the base `.gitignore` ignores `screenshots/`) | 2026-10-19 |
+| Q-008 | Branch naming | `phase-N-<name>`, matching the phase document names | 2026-10-19 |
+| Q-009 | Deadline | No fixed deadline | 2026-10-13 |
+| Q-010 | Approval stability | One valid approved run is enough | 2026-10-19 |
+| Q-012 | Number of Few-shot examples | 3: simple, medium, complex | 2026-10-19 |
+| Q-013 | Mandatory edge cases | Vague or incomplete report; several problems in one report | 2026-10-19 |
+| — | Database | None | 2026-10-13 |
+| — | Discovery scope | Challenge only, lean documentation | 2026-10-13 |
+| — | Additional techniques | Role Prompting and internal Chain of Thought | 2026-10-19 |
+| — | Invalid runs and fixed models | BR-018 and BR-019 | 2026-10-19 |
+| — | README | Replaces the challenge statement (FR-038) | 2026-10-19 |
+
+### 17.2. Open questions
+
+| ID | Question | Impact | Next action |
+|---|---|---|---|
+| Q-011 | Product owner and PRD approver: Marcos Fonseca is assumed | Document governance | Confirm when approving this version |
+| Q-014 | How to show the techniques on the Hub: tags and description (recommended) or another field | FR-019 verifiability | Check `Client.push_prompt` in the installed `langsmith` during Phase 3 |
+| Q-015 | Compatibility of the pinned packages with Python 3.14 | Environment setup | Check during the Phase 1 install; fallback: install Python 3.12 or 3.13 |
+
+## 18. Product evolution and PRD versioning
+
+- Update this document on relevant changes to requirements, scope, objectives or success criteria, and record them below.
+- When a requirement changes, update its stories, rules, criteria and traceability in the same revision.
+- Never reuse removed identifiers; mark discontinued items as "Removed".
+- Record as a new version any decision that changes the MVP.
+
+### 18.1. Version history
+
+| Date | Version | Change | Reason |
+|---|---|---|---|
+| 2026-10-13 | 0.1 | Document created (Portuguese) | Initial consolidation of the challenge requirements, `CLAUDE.md` and the base repository |
+| 2026-10-19 | 0.2 | Translated to English; Q-001 to Q-010, Q-012 and Q-013 resolved; requirements tables condensed; FR-008 to FR-010, FR-012, FR-019, FR-029, FR-033 detailed; FR-038, FR-039, BR-018 to BR-020, RK-09 to RK-12, Q-015 added; RK-07 and RK-10 closed; PB-01 corrected (vague persona, not missing) | Discovery interview and reading of the base repository code |
+
+## 19. Traceability matrix
+
+### 19.1. Objectives, problems and indicators
+
+| Objective | Problems | Indicators | Groups |
+|---|---|---|---|
+| OBJ-01 | PB-01, PB-02 | KPI-01 to KPI-06, KPI-08 | G2, G3, G4 |
 | OBJ-02 | PB-02 | KPI-08 | G1, G3, G4 |
 | OBJ-03 | PB-04 | KPI-07 | G2, G5 |
 | OBJ-04 | PB-03 | KPI-09 | G6 |
 
-### 19.2. Requisitos, histórias e critérios
+### 19.2. Requirements, stories, specs and phases
 
-| Grupo | Requisitos funcionais | Histórias | Regras de negócio | Requisitos não funcionais | Critérios Gherkin |
-|---|---|---|---|---|---|
-| G1 | FR-001 a FR-004 | US-001 | BR-013, BR-014, BR-015 | NFR-003, NFR-004, NFR-010 | Obtenção do prompt base |
-| G2 | FR-005 a FR-014 | US-002, US-006 | BR-004, BR-008, BR-009, BR-016 | NFR-010 | Validação estrutural |
-| G3 | FR-015 a FR-020 | US-004, US-006 | BR-005, BR-006, BR-008 | NFR-003, NFR-010 | Publicação do prompt v2 |
-| G4 | FR-021 a FR-024 | US-005, US-006 | BR-001, BR-002, BR-003, BR-007, BR-010, BR-012 | NFR-001, NFR-002, NFR-006, NFR-007 | Avaliação do prompt publicado |
-| G5 | FR-025 a FR-031 | US-003 | BR-008 | NFR-008 | Validação estrutural |
-| G6 | FR-032 a FR-037 | US-007, US-008 | BR-011, BR-017 | NFR-003, NFR-011 | Evidências públicas da entrega |
-
-### 19.3. Requisitos sem justificativa clara
-
-Nenhum requisito funcional foi identificado sem problema ou objetivo associado. Seguem como requisitos de processo, sem objetivo de produto associado:
-- NFR-005: restrição técnica do desafio;
-- NFR-009: padrão de qualidade de código.
+| Group | Functional requirements | Stories | Business rules | NFRs | Spec | Phase |
+|---|---|---|---|---|---|---|
+| G1 | FR-001 to FR-004 | US-001 | BR-013, BR-014, BR-015 | NFR-003, NFR-004, NFR-010 | [001](../../specs/001-pull-prompt/spec.md) | 1 |
+| G2 | FR-005 to FR-014 | US-002, US-006 | BR-004, BR-008, BR-009, BR-016, BR-020 | NFR-010 | [002](../../specs/002-prompt-v2/spec.md) | 2, 4 |
+| G3 | FR-015 to FR-020 | US-004, US-006 | BR-005, BR-006, BR-008 | NFR-003, NFR-010 | [003](../../specs/003-push-prompt/spec.md) | 3 |
+| G4 | FR-021 to FR-024 | US-005, US-006 | BR-001, BR-002, BR-003, BR-007, BR-010, BR-012, BR-018, BR-019 | NFR-001, NFR-002, NFR-006, NFR-007 | — (Existing) | 3, 4 |
+| G5 | FR-025 to FR-031, FR-039 | US-003 | BR-008 | NFR-008 | [004](../../specs/004-validation-tests/spec.md) | 5 |
+| G6 | FR-032 to FR-038 | US-007, US-008 | BR-011, BR-017 | NFR-003, NFR-011 | — | 4 |
