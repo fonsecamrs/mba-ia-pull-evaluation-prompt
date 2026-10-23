@@ -6,10 +6,10 @@
 |---|---|
 | Product / project | `mba-ia-pull-evaluation-prompt`: Challenge 2 of the AI MBA (Full Cycle), "Prompt Optimization and Evaluation with LangChain and LangSmith" |
 | Document | Product Requirements Document (PRD) |
-| Version | 0.2 |
-| Status | Draft, pending approval |
-| Last updated | 2026-10-19 |
-| Product owner / approver | Marcos Fonseca (assumed during discovery; see Q-011) |
+| Version | 1.0 |
+| Status | Approved (2026-10-23) |
+| Last updated | 2026-10-23 |
+| Product owner / approver | Marcos Fonseca |
 | Purpose | Single source of truth for the what, why and for whom of the product, with traceable and verifiable requirements that guide specs, phase documents, development and tests |
 
 ### 1.1. Sources
@@ -562,12 +562,11 @@ RK-07 (delivery repository not a fork) was closed on 2026-10-13: the fork `fonse
 | — | Additional techniques | Role Prompting and internal Chain of Thought | 2026-10-19 |
 | — | Invalid runs and fixed models | BR-018 and BR-019 | 2026-10-19 |
 | — | README | Replaces the challenge statement (FR-038) | 2026-10-19 |
+| Q-011 | Product owner and PRD approver | Marcos Fonseca, confirmed when approving version 1.0 | 2026-10-23 |
 
 ### 17.2. Open questions
 
-| ID | Question | Impact | Next action |
-|---|---|---|---|
-| Q-011 | Product owner and PRD approver: Marcos Fonseca is assumed | Document governance | Confirm when approving this version |
+None.
 
 ## 18. Product evolution and PRD versioning
 
@@ -582,6 +581,7 @@ RK-07 (delivery repository not a fork) was closed on 2026-10-13: the fork `fonse
 |---|---|---|---|
 | 2026-10-13 | 0.1 | Document created (Portuguese) | Initial consolidation of the challenge requirements, `CLAUDE.md` and the base repository |
 | 2026-10-19 | 0.2 | Translated to English; Q-001 to Q-010, Q-012 and Q-013 resolved; requirements tables condensed; FR-008 to FR-010, FR-012, FR-019, FR-029, FR-033 detailed; FR-038, FR-039, BR-018 to BR-020, RK-09 to RK-12, Q-015 added; RK-07 and RK-10 closed; PB-01 corrected (vague persona, not missing) | Discovery interview and reading of the base repository code |
+| 2026-10-23 | 1.0 | Approved by the product owner; Q-011 resolved; no open questions left. Includes the findings recorded during Phases 1 to 4 (Q-014, Q-015, judge temperature in NFR-001 and RK-03) | OBJ-01 reached on the first evaluation (average 0.918) and delivery completed |
 
 ## 19. Traceability matrix
 
