@@ -45,6 +45,14 @@ Discarded runs (BR-018) are listed with the reason and do not get an iteration n
    "Técnicas Aplicadas (Fase 2)", "Resultados Finais" and "Como Executar", with a link to the original challenge statement.
 4. Check that no key or private workspace link appears in the README or screenshots (NFR-003).
 
+## Delivery log
+
+- 2026-10-23: public dataset link created once (BR-011), recorded in the README. Checked without credentials: the
+  public API returns the dataset with 15 examples and the approved experiment. Do not run `share_dataset` again.
+- 2026-10-23: screenshots saved in `docs/images/` (scores per example, dataset summary, trace input and output of
+  the complex checkout example).
+- 2026-10-23: README replaced with the delivery documentation.
+
 ## Acceptance criteria
 
 - The last valid run is APROVADO (BR-001).
